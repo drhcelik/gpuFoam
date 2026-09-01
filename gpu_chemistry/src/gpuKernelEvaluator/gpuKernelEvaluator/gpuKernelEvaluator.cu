@@ -1,6 +1,7 @@
 #include "gpuKernelEvaluator.H"
 
 #include <iostream>
+#include <algorithm>
 
 #include "cuda_host_dev.H"
 
