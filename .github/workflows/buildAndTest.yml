@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build code base
-    runs-on: "ubuntu-22.04"
+    runs-on: "ubuntu-26.04"
     container:
       image: niemiti/ofdevcuda:latest
       options: --user root
