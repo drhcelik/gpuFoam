@@ -23,6 +23,11 @@ lu(const std::vector<gScalar>& m_vals,
 
 TestData::odeSystemResults odesystem(TestData::Mechanism mech);
 
+//- ODE system derivative and Jacobian at the given state in the GPU
+//  layout [Y, T, p]
+TestData::odeSystemResults odesystem(TestData::Mechanism         mech,
+                                     const std::vector<gScalar>& y0);
+
 std::vector<gScalar> ode_solve(TestData::Mechanism mech,
                                std::string         solver_name,
                                gScalar             xStart,

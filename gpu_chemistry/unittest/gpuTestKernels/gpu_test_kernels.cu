@@ -367,6 +367,22 @@ lu(const std::vector<gScalar>& m_vals, const std::vector<gScalar>& s_vals)
 
 TestData::odeSystemResults odesystem(TestData::Mechanism mech)
 {
+    const auto nEqns = TestData::equationCount(mech);
+    const auto nSpecie = TestData::speciesCount(mech);
+    std::vector<gScalar> t(nEqns);
+    fill_linear(t);
+    t[nSpecie] = TestData::TInf(mech);
+    t[nSpecie + 1] = TestData::pInf(mech);
+    return odesystem(mech, t);
+}
+
+
+TestData::odeSystemResults odesystem
+(
+    TestData::Mechanism mech,
+    const std::vector<gScalar>& y0
+)
+{
     using namespace FoamGpu;
 
     auto gpu_thermos = toDeviceVector(makeGpuThermos_h(mech));
@@ -383,15 +399,7 @@ TestData::odeSystemResults odesystem(TestData::Mechanism mech)
     );
 
 
-    const device_vector<gScalar> y0_v
-    = [&](){
-
-        std::vector<gScalar> t(nEqns);
-        fill_linear(t);
-        t[nSpecie] = TestData::TInf(mech);
-        t[nSpecie + 1] = TestData::pInf(mech);
-        return toDeviceVector(t);
-    }();
+    const device_vector<gScalar> y0_v = toDeviceVector(y0);
 
 
 
