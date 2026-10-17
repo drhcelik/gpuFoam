@@ -4,19 +4,9 @@
 
 namespace FoamGpu {
 
-inline CUDA_HOSTDEV bool isInteger(gScalar N) {
-
-    // Convert float value
-    // of N to integer
-    int X = N;
-
-    double temp2 = N - X;
-
-    // If N is not equivalent
-    // to any integer
-    if (temp2 > 0) { return false; }
-    return true;
-}
+/// @brief Return true if N is an integer, using the same rule as the
+/// OpenFOAM-dev specieExponent(scalar) constructor: floor(N) == N.
+inline CUDA_HOSTDEV bool isInteger(gScalar N) { return floor(N) == N; }
 
 inline CUDA_HOSTDEV gScalar integerPow(const gScalar x,
                                        const gLabel  e) {

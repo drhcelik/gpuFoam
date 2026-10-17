@@ -7,6 +7,7 @@
 #include "test_utilities.H"
 #include "mechanisms.H"
 #include "mdspan.H"
+#include "gpuSpecieExponent.H"
 
 
 TEST_CASE("make_mdspan", "[CPU]"){
@@ -770,6 +771,17 @@ TEST_CASE("Test gpuOdeSystem temperature limits (on CPU)", "[CPU]")
             );
         }
     }
+}
+
+
+TEST_CASE("Test isInteger (on CPU)", "[CPU]")
+{
+    // Same rule as the OpenFOAM-dev specieExponent(scalar) constructor
+    CHECK(!FoamGpu::isInteger(-0.5));
+    CHECK(FoamGpu::isInteger(-1.0));
+    CHECK(FoamGpu::isInteger(0.0));
+    CHECK(FoamGpu::isInteger(2.0));
+    CHECK(!FoamGpu::isInteger(0.2));
 }
 
 
