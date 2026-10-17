@@ -9,15 +9,28 @@ namespace Foam {
 
 enum jacobianType { fast = 0, exact = 1 };
 
+//- Reference ODE system mirroring chemistryModels::Standard::derivatives and
+//  ::jacobian of OpenFOAM-dev (f31f38e312).
+//
+//  State layout mapping
+//  ~~~~~~~~~~~~~~~~~~~~
+//  OpenFOAM-dev integrates Y_0..Y_{n-1}, T (nEqns = nSpecie + 1) with the
+//  pressure held constant as a member (p_).  The gpuFoam GPU ODE system
+//  still integrates Y_0..Y_{n-1}, T, p (nEqns = nSpecie + 2) with
+//  dp/dt = 0 and a zero p row and column in the Jacobian.  The tests
+//  therefore compare the first nSpecie + 1 entries of state and derivative
+//  vectors, and the leading (nSpecie + 1)x(nSpecie + 1) block of the
+//  Jacobian, see drop_pressure() in test_utilities.H.
 class MockOFSystem : public ODESystem {
 
     const PtrList<FoamGpu::testThermoType1>            specieThermos_;
     const ReactionList<FoamGpu::testThermoType1>       reactions_;
     label                                    nSpecie_;
+    scalar                                   p_;
     mutable scalarField                      Y_;
-    mutable scalarField                      c_;
-    mutable FixedList<scalarField, 5>        YTpWork_;
-    mutable FixedList<scalarSquareMatrix, 2> YTpYTpWork_;
+    mutable reaction::state                  s_;
+    mutable FixedList<scalarField, 5>        YTWork_;
+    mutable FixedList<scalarSquareMatrix, 2> YTYTWork_;
 
     const bool  reduction_ = false;
     List<label> cTos_{};
@@ -39,47 +52,49 @@ public:
                      specieThermos_,
                      TestData::makeReactionDict(m))
         , nSpecie_(TestData::speciesCount(m))
+        , p_(TestData::pInf(m))
         , Y_(nSpecie_)
-        , c_(nSpecie_)
-        , YTpWork_(scalarField(nSpecie_ + 2))
-        , YTpYTpWork_(scalarSquareMatrix(nSpecie_ + 2)) {}
+        , s_(nSpecie_)
+        , YTWork_(scalarField(nSpecie_ + 1))
+        , YTYTWork_(scalarSquareMatrix(nSpecie_ + 1, Zero)) {}
 
     virtual ~MockOFSystem() {}
 
-    label nEqns() const override { return nSpecie_ + 2; }
+    //- Set the (constant) pressure
+    void setPressure(const scalar p) { p_ = p; }
+
+    label nEqns() const override { return nSpecie_ + 1; }
 
     void derivatives(const scalar       time,
-                     const scalarField& YTp,
+                     const scalarField& YT,
                      const label        li,
-                     scalarField&       dYTpdt) const override {
+                     scalarField&       dYTdt) const override {
 
-        forAll(Y_, i) { Y_[i] = fmax(YTp[i], 0); }
+        forAll(Y_, i) { Y_[i] = max(YT[i], 0); }
 
-        const scalar T = YTp[nSpecie_];
-        const scalar p = YTp[nSpecie_ + 1];
-
-        // printf("derivative T: %.17g \n", T);
-        // printf("derivative p: %.17g \n", p);
+        const scalar T
+        (
+            maxMin(YT[nSpecie_], reactions_.Tlow(), reactions_.Thigh())
+        );
 
         // Evaluate the mixture density
         scalar rhoM = 0;
         for (label i = 0; i < Y_.size(); i++) {
-            rhoM += Y_[i] / specieThermos_[i].rho(p, T);
+            rhoM += Y_[i] / specieThermos_[i].rho(p_, T);
         }
         rhoM = 1 / rhoM;
 
-        // printf("derivative rhoM: %.17g \n", rhoM);
-
         // Evaluate the concentrations
         for (label i = 0; i < Y_.size(); i++) {
-            c_[i] = rhoM / specieThermos_[i].W() * Y_[i];
+            s_.c[i] = rhoM / specieThermos_[i].W() * Y_[i];
         }
 
+        s_.reset(p_, T, li);
+
         // Evaluate contributions from reactions
-        dYTpdt = Zero;
+        dYTdt = Zero;
         forAll(reactions_, ri) {
-            reactions_[ri].dNdtByV(
-                p, T, c_, li, dYTpdt, reduction_, cTos_, 0);
+            reactions_[ri].dNdtByV(s_, dYTdt, reduction_, cTos_, 0);
         }
 
         // Reactions return dNdtByV, so we need to convert the result
@@ -87,7 +102,7 @@ public:
         for (label i = 0; i < nSpecie_; i++) {
             const scalar WiByrhoM =
                 specieThermos_[sToc(i)].W() / rhoM;
-            scalar& dYidt = dYTpdt[i];
+            scalar& dYidt = dYTdt[i];
             dYidt *= WiByrhoM;
         }
 
@@ -96,43 +111,34 @@ public:
         // Evaluate the mixture Cp
         scalar CpM = 0;
         for (label i = 0; i < Y_.size(); i++) {
-            CpM += Y_[i] * specieThermos_[i].Cp(p, T);
+            CpM += Y_[i] * specieThermos_[i].Cp(p_, T);
         }
-
-        // printf("derivative CpM: %.17g \n", CpM);
 
         // dT/dt
-        scalar& dTdt = dYTpdt[nSpecie_];
+        scalar& dTdt = dYTdt[nSpecie_];
         for (label i = 0; i < nSpecie_; i++) {
-            dTdt -= dYTpdt[i] * specieThermos_[sToc(i)].ha(p, T);
+            dTdt -= dYTdt[i] * specieThermos_[sToc(i)].ha(p_, T);
         }
         dTdt /= CpM;
-
-        // printf("derivative dTdt: %.17g \n", dTdt);
-
-        // dp/dt = 0 (pressure is assumed constant)
-        scalar& dpdt = dYTpdt[nSpecie_ + 1];
-        dpdt         = 0;
     }
 
     void jacobian(const scalar        t,
-                  const scalarField&  YTp,
+                  const scalarField&  YT,
                   const label         li,
-                  scalarField&        dYTpdt,
+                  scalarField&        dYTdt,
                   scalarSquareMatrix& J) const override {
 
-        forAll(c_, i) { Y_[i] = fmax(YTp[i], 0); }
+        forAll(Y_, i) { Y_[i] = max(YT[i], 0); }
 
-        const scalar T = YTp[nSpecie_];
-        const scalar p = YTp[nSpecie_ + 1];
-
-        // printf("jacobian T: %.17g \n", T);
-        // printf("jacobian p: %.17g \n", p);
+        const scalar T
+        (
+            maxMin(YT[nSpecie_], reactions_.Tlow(), reactions_.Thigh())
+        );
 
         // Evaluate the specific volumes and mixture density
-        scalarField& v = YTpWork_[0];
+        scalarField& v = YTWork_[0];
         for (label i = 0; i < Y_.size(); i++) {
-            v[i] = 1 / specieThermos_[i].rho(p, T);
+            v[i] = 1 / specieThermos_[i].rho(p_, T);
         }
         scalar rhoM = 0;
         for (label i = 0; i < Y_.size(); i++) {
@@ -140,16 +146,16 @@ public:
         }
         rhoM = 1 / rhoM;
 
-        // printf("jacobian rhoM: %.17g \n", rhoM);
-
         // Evaluate the concentrations
         for (label i = 0; i < Y_.size(); i++) {
-            c_[i] = rhoM / specieThermos_[i].W() * Y_[i];
+            s_.c[i] = rhoM / specieThermos_[i].W() * Y_[i];
         }
+
+        s_.reset(p_, T, li);
 
         // Evaluate the derivatives of concentration w.r.t. mass
         // fraction
-        scalarSquareMatrix& dcdY = YTpYTpWork_[0];
+        scalarSquareMatrix& dcdY = YTYTWork_[0];
         for (label i = 0; i < nSpecie_; i++) {
             const scalar rhoMByWi =
                 rhoM / specieThermos_[sToc(i)].W();
@@ -171,33 +177,27 @@ public:
         scalar alphavM = 0;
         for (label i = 0; i < Y_.size(); i++) {
             alphavM +=
-                Y_[i] * rhoM * v[i] * specieThermos_[i].alphav(p, T);
+                Y_[i] * rhoM * v[i] * specieThermos_[i].alphav(p_, T);
         }
 
-        // printf("jacobian alphavM: %.17g \n", alphavM);
-
         // Evaluate contributions from reactions
-        dYTpdt = Zero;
-
-        scalarSquareMatrix& ddNdtByVdcTp = YTpYTpWork_[1];
-        for (label i = 0; i < nSpecie_ + 2; i++) {
-            for (label j = 0; j < nSpecie_ + 2; j++) {
-                ddNdtByVdcTp[i][j] = 0;
+        dYTdt = Zero;
+        scalarSquareMatrix& ddNdtByVdcT = YTYTWork_[1];
+        for (label i = 0; i < nSpecie_ + 1; i++) {
+            for (label j = 0; j < nSpecie_ + 1; j++) {
+                ddNdtByVdcT[i][j] = 0;
             }
         }
         forAll(reactions_, ri) {
-            reactions_[ri].ddNdtByVdcTp(p,
-                                        T,
-                                        c_,
-                                        li,
-                                        dYTpdt,
-                                        ddNdtByVdcTp,
-                                        reduction_,
-                                        cTos_,
-                                        0,
-                                        nSpecie_,
-                                        YTpWork_[1],
-                                        YTpWork_[2]);
+            reactions_[ri].ddNdtByVdcT(s_,
+                                       dYTdt,
+                                       ddNdtByVdcT,
+                                       reduction_,
+                                       cTos_,
+                                       0,
+                                       nSpecie_,
+                                       YTWork_[1],
+                                       YTWork_[2]);
         }
 
         // Reactions return dNdtByV, so we need to convert the result
@@ -205,20 +205,19 @@ public:
         for (label i = 0; i < nSpecie_; i++) {
             const scalar WiByrhoM =
                 specieThermos_[sToc(i)].W() / rhoM;
-            scalar& dYidt = dYTpdt[i];
+            scalar& dYidt = dYTdt[i];
             dYidt *= WiByrhoM;
 
             for (label j = 0; j < nSpecie_; j++) {
                 scalar ddNidtByVdYj = 0;
                 switch (jacobianType_) {
                 case jacobianType::fast: {
-                    const scalar ddNidtByVdcj = ddNdtByVdcTp(i, j);
+                    const scalar ddNidtByVdcj = ddNdtByVdcT(i, j);
                     ddNidtByVdYj = ddNidtByVdcj * dcdY(j, j);
                 } break;
                 case jacobianType::exact:
                     for (label k = 0; k < nSpecie_; k++) {
-                        const scalar ddNidtByVdck =
-                            ddNdtByVdcTp(i, k);
+                        const scalar ddNidtByVdck = ddNdtByVdcT(i, k);
                         ddNidtByVdYj += ddNidtByVdck * dcdY(k, j);
                     }
                     break;
@@ -229,47 +228,35 @@ public:
                             rhoM * v[sToc(j)] * dYidt;
             }
 
-            scalar ddNidtByVdT = ddNdtByVdcTp(i, nSpecie_);
+            scalar ddNidtByVdT = ddNdtByVdcT(i, nSpecie_);
             for (label j = 0; j < nSpecie_; j++) {
-                const scalar ddNidtByVdcj = ddNdtByVdcTp(i, j);
-                ddNidtByVdT -= ddNidtByVdcj * c_[sToc(j)] * alphavM;
+                const scalar ddNidtByVdcj = ddNdtByVdcT(i, j);
+                ddNidtByVdT -= ddNidtByVdcj * s_.c[sToc(j)] * alphavM;
             }
 
             scalar& ddYidtdT = J(i, nSpecie_);
             ddYidtdT = WiByrhoM * ddNidtByVdT + alphavM * dYidt;
-
-            scalar& ddYidtdp = J(i, nSpecie_ + 1);
-            ddYidtdp         = 0;
         }
 
         // Evaluate the effect on the thermodynamic system ...
 
         // Evaluate the mixture Cp and its derivative
-        scalarField& Cp  = YTpWork_[3];
+        scalarField& Cp  = YTWork_[3];
         scalar       CpM = 0, dCpMdT = 0;
         for (label i = 0; i < Y_.size(); i++) {
-            Cp[i] = specieThermos_[i].Cp(p, T);
+            Cp[i] = specieThermos_[i].Cp(p_, T);
             CpM += Y_[i] * Cp[i];
-            dCpMdT += Y_[i] * specieThermos_[i].dCpdT(p, T);
+            dCpMdT += Y_[i] * specieThermos_[i].dCpdT(p_, T);
         }
-
-        // printf("jacobian CpM: %.17g \n", CpM);
-        // printf("jacobian dCpMdT: %.17g \n", dCpMdT);
 
         // dT/dt
-        scalarField& Ha   = YTpWork_[4];
-        scalar&      dTdt = dYTpdt[nSpecie_];
+        scalarField& ha   = YTWork_[4];
+        scalar&      dTdt = dYTdt[nSpecie_];
         for (label i = 0; i < nSpecie_; i++) {
-            Ha[sToc(i)] = specieThermos_[sToc(i)].ha(p, T);
-            dTdt -= dYTpdt[i] * Ha[sToc(i)];
+            ha[sToc(i)] = specieThermos_[sToc(i)].ha(p_, T);
+            dTdt -= dYTdt[i] * ha[sToc(i)];
         }
         dTdt /= CpM;
-
-        // printf("jacobian dTdt: %.17g \n", dTdt);
-
-        // dp/dt = 0 (pressure is assumed constant)
-        scalar& dpdt = dYTpdt[nSpecie_ + 1];
-        dpdt         = 0;
 
         // d(dTdt)/dY
         for (label i = 0; i < nSpecie_; i++) {
@@ -277,7 +264,7 @@ public:
             ddTdtdYi         = 0;
             for (label j = 0; j < nSpecie_; j++) {
                 const scalar ddYjdtdYi = J(j, i);
-                ddTdtdYi -= ddYjdtdYi * Ha[sToc(j)];
+                ddTdtdYi -= ddYjdtdYi * ha[sToc(j)];
             }
             ddTdtdYi -= Cp[sToc(i)] * dTdt;
             ddTdtdYi /= CpM;
@@ -287,22 +274,12 @@ public:
         scalar& ddTdtdT = J(nSpecie_, nSpecie_);
         ddTdtdT         = 0;
         for (label i = 0; i < nSpecie_; i++) {
-            const scalar dYidt    = dYTpdt[i];
+            const scalar dYidt    = dYTdt[i];
             const scalar ddYidtdT = J(i, nSpecie_);
-            ddTdtdT -= dYidt * Cp[sToc(i)] + ddYidtdT * Ha[sToc(i)];
+            ddTdtdT -= dYidt * Cp[sToc(i)] + ddYidtdT * ha[sToc(i)];
         }
         ddTdtdT -= dTdt * dCpMdT;
         ddTdtdT /= CpM;
-
-        // d(dTdt)/dp = 0 (pressure is assumed constant)
-        scalar& ddTdtdp = J(nSpecie_, nSpecie_ + 1);
-        ddTdtdp         = 0;
-
-        // d(dpdt)/dYiTp = 0 (pressure is assumed constant)
-        for (label i = 0; i < nSpecie_ + 2; i++) {
-            scalar& ddpdtdYiTp = J(nSpecie_ + 1, i);
-            ddpdtdYiTp         = 0;
-        }
     }
 
     inline label sToc(const label si) const { return si; }

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cmath>
 #include <cstdlib> //rand
+#include <vector>
 
 
 static inline double random_number(double LO, double HI){
@@ -45,15 +47,31 @@ static inline void remove_negative(C& c, double tolerance){
 }
 
 
+// gpuFoam's GPU ODE state is [Y_0..Y_{n-1}, T, p] (nSpecie + 2 entries) while
+// the OpenFOAM-dev reference (chemistryModels::Standard) integrates
+// [Y_0..Y_{n-1}, T] (nSpecie + 1 entries) with p held constant.  These
+// helpers drop the trailing pressure entry from a GPU-layout vector, or the
+// trailing pressure row and column from a GPU-layout row-major square
+// matrix, so that like entries are compared.
 
+template<class T>
+static inline std::vector<T> drop_pressure(const std::vector<T>& v)
+{
+    return std::vector<T>(v.begin(), v.end() - 1);
+}
 
-
-
-
-
-
-
-
-
-
-
+template<class T>
+static inline std::vector<T> drop_pressure_matrix(const std::vector<T>& m)
+{
+    const int n = static_cast<int>(std::lround(std::sqrt(double(m.size()))));
+    std::vector<T> ret;
+    ret.reserve((n - 1)*(n - 1));
+    for (int i = 0; i < n - 1; ++i)
+    {
+        for (int j = 0; j < n - 1; ++j)
+        {
+            ret.push_back(m[i*n + j]);
+        }
+    }
+    return ret;
+}

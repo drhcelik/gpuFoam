@@ -403,7 +403,7 @@ static inline void reactionTests(const TestData::reactionResults& test_result, c
         REQUIRE_THAT
         (
             reference.ddNdtByVdcTp[i],
-            Catch::Matchers::Approx(test_result.ddNdtByVdcTp[i]).epsilon(errorTol)
+            Catch::Matchers::Approx(drop_pressure_matrix(test_result.ddNdtByVdcTp[i])).epsilon(errorTol)
         );
     }
 
@@ -498,20 +498,20 @@ TEST_CASE("Test ludecompose (on CPU)", "[CPU]")
         auto [m_test, p_test, s_test] = CpuTestKernels::lu(vals, source);
         auto [m_ref, p_ref, s_ref] = OFReferenceKernels::lu(vals, source);
 
-        REQUIRE_THAT
-        (
-            m_test,
-            Catch::Matchers::Approx(m_ref).epsilon(errorTol)
-        );
-        REQUIRE_THAT
-        (
-            p_test,
-            Catch::Matchers::Approx(p_ref).epsilon(errorTol)
-        );
+        // The LU factors and pivot indices are not compared: OpenFOAM-dev's
+        // ikj LUDecompose (10f026fd67) breaks ties in the scaled pivot
+        // search by taking the first candidate row, whereas gpuFoam's Crout
+        // form takes the last.  Ties are common (every row whose largest
+        // coefficient lies in the pivot column has ratio 1), so both give
+        // valid but different factorisations.  The solution is unique.
+        (void)m_test; (void)m_ref; (void)p_test; (void)p_ref;
         REQUIRE_THAT
         (
             s_test,
-            Catch::Matchers::Approx(s_ref).epsilon(errorTol)
+            // Absolute margin: the two pivot sequences give round-off
+            // differences of O(cond(A)*eps*|x|), |x| ~ 1, which a purely
+            // relative check rejects for near-zero solution components
+            Catch::Matchers::Approx(s_ref).epsilon(errorTol).margin(1e-12)
         );
 
     }
@@ -537,20 +537,20 @@ TEST_CASE("Test ludecompose (on GPU)", "[GPU]")
         auto [m_test, p_test, s_test] = GpuTestKernels::lu(vals, source);
         auto [m_ref, p_ref, s_ref] = OFReferenceKernels::lu(vals, source);
 
-        REQUIRE_THAT
-        (
-            m_test,
-            Catch::Matchers::Approx(m_ref).epsilon(errorTol)
-        );
-        REQUIRE_THAT
-        (
-            p_test,
-            Catch::Matchers::Approx(p_ref).epsilon(errorTol)
-        );
+        // The LU factors and pivot indices are not compared: OpenFOAM-dev's
+        // ikj LUDecompose (10f026fd67) breaks ties in the scaled pivot
+        // search by taking the first candidate row, whereas gpuFoam's Crout
+        // form takes the last.  Ties are common (every row whose largest
+        // coefficient lies in the pivot column has ratio 1), so both give
+        // valid but different factorisations.  The solution is unique.
+        (void)m_test; (void)m_ref; (void)p_test; (void)p_ref;
         REQUIRE_THAT
         (
             s_test,
-            Catch::Matchers::Approx(s_ref).epsilon(errorTol)
+            // Absolute margin: the two pivot sequences give round-off
+            // differences of O(cond(A)*eps*|x|), |x| ~ 1, which a purely
+            // relative check rejects for near-zero solution components
+            Catch::Matchers::Approx(s_ref).epsilon(errorTol).margin(1e-12)
         );
 
     }
@@ -574,13 +574,13 @@ TEST_CASE("Test gpuOdeSystem (on CPU)", "[CPU]")
 
         CHECK_THAT
         (
-            test_result.derivative,
+            drop_pressure(test_result.derivative),
             Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
         );
 
         CHECK_THAT
         (
-            test_result.jacobian,
+            drop_pressure_matrix(test_result.jacobian),
             Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
         );
     }
@@ -592,13 +592,13 @@ TEST_CASE("Test gpuOdeSystem (on CPU)", "[CPU]")
 
         CHECK_THAT
         (
-            test_result.derivative,
+            drop_pressure(test_result.derivative),
             Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
         );
 
         CHECK_THAT
         (
-            test_result.jacobian,
+            drop_pressure_matrix(test_result.jacobian),
             Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
         );
     }
@@ -609,13 +609,13 @@ TEST_CASE("Test gpuOdeSystem (on CPU)", "[CPU]")
 
         CHECK_THAT
         (
-            test_result.derivative,
+            drop_pressure(test_result.derivative),
             Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
         );
 
         CHECK_THAT
         (
-            test_result.jacobian,
+            drop_pressure_matrix(test_result.jacobian),
             Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
         );
     }
@@ -637,13 +637,13 @@ TEST_CASE("Test gpuOdeSystem (on GPU)", "[GPU]")
 
         CHECK_THAT
         (
-            test_result.derivative,
+            drop_pressure(test_result.derivative),
             Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
         );
 
         CHECK_THAT
         (
-            test_result.jacobian,
+            drop_pressure_matrix(test_result.jacobian),
             Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
         );
 
@@ -658,13 +658,13 @@ TEST_CASE("Test gpuOdeSystem (on GPU)", "[GPU]")
 
         CHECK_THAT
         (
-            test_result.derivative,
+            drop_pressure(test_result.derivative),
             Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
         );
 
         CHECK_THAT
         (
-            test_result.jacobian,
+            drop_pressure_matrix(test_result.jacobian),
             Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
         );
     }
@@ -676,13 +676,13 @@ TEST_CASE("Test gpuOdeSystem (on GPU)", "[GPU]")
 
         CHECK_THAT
         (
-            test_result.derivative,
+            drop_pressure(test_result.derivative),
             Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
         );
 
         CHECK_THAT
         (
-            test_result.jacobian,
+            drop_pressure_matrix(test_result.jacobian),
             Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
         );
 
@@ -713,7 +713,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock12")
         {
             std::string name = "Rosenbrock12";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -728,7 +728,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock23")
         {
             std::string name = "Rosenbrock23";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -742,7 +742,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock34")
         {
             std::string name = "Rosenbrock34";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -766,7 +766,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock12")
         {
             std::string name = "Rosenbrock12";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -780,7 +780,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock23")
         {
             std::string name = "Rosenbrock23";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -794,7 +794,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock34")
         {
             std::string name = "Rosenbrock34";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -819,7 +819,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock12")
         {
             std::string name = "Rosenbrock12";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -833,7 +833,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock23")
         {
             std::string name = "Rosenbrock23";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -847,7 +847,7 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
         SECTION("Rosenbrock34")
         {
             std::string name = "Rosenbrock34";
-            auto test_result = CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(CpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -893,7 +893,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock12")
         {
             std::string name = "Rosenbrock12";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -907,7 +907,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock23")
         {
             std::string name = "Rosenbrock23";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -921,7 +921,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock34")
         {
             std::string name = "Rosenbrock34";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -943,7 +943,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock12")
         {
             std::string name = "Rosenbrock12";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -957,7 +957,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock23")
         {
             std::string name = "Rosenbrock23";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -971,7 +971,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock34")
         {
             std::string name = "Rosenbrock34";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -996,7 +996,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock12")
         {
             std::string name = "Rosenbrock12";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -1010,7 +1010,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock23")
         {
             std::string name = "Rosenbrock23";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);
@@ -1024,7 +1024,7 @@ TEST_CASE("Test gpuOdeSolver (on GPU)", "[GPU]")
         SECTION("Rosenbrock34")
         {
             std::string name = "Rosenbrock34";
-            auto test_result = GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
+            auto test_result = drop_pressure(GpuTestKernels::ode_solve(mech, name, xStart, xEnd, dxTry));
             auto reference = OFReferenceKernels::ode_solve(mech, name, xStart, xEnd, dxTry);
             remove_negative(test_result, errorTol);
             remove_negative(reference, errorTol);

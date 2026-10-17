@@ -134,11 +134,16 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
     Foam::scalar T  = TestData::TInf(mech);
     Foam::label  li = 0;
 
+    // OpenFOAM-dev reaction Jacobian layout: [c_0..c_{n-1}, T]
+    const gLabel       nEqnsRef = nSpecie + 1;
     Foam::List<gLabel> c2s;
     gLabel             csi0 = 0;
     gLabel             Tsi  = nSpecie;
-    Foam::scalarField  cTpWork0(nSpecie, 0);
-    Foam::scalarField  cTpWork1(nSpecie, 0);
+    Foam::scalarField  cTWork0(nEqnsRef, 0);
+    Foam::scalarField  cTWork1(nEqnsRef, 0);
+
+    Foam::reaction::state s(nSpecie);
+    s.reset(p, T, c, li);
 
     std::vector<gScalar> Thigh(nReactions);
     std::vector<gScalar> Tlow(nReactions);
@@ -151,22 +156,23 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
     std::vector<std::vector<gScalar>> ddNdtByVdcTp(nReactions);
 
     for (Foam::label i = 0; i < reactions.size(); ++i) {
-        Thigh[i] = reactions[i].Thigh();
-        Tlow[i]  = reactions[i].Tlow();
+        // OpenFOAM-dev (9dfdc49d8e) applies a single pair of temperature
+        // limits to the whole reaction scheme, held by the ReactionList.
+        // Reaction<ThermoType>::Tlow/Thigh now resolve to the thermo's
+        // (JANAF) limits, which are not the reaction limits.
+        Thigh[i] = reactions.Thigh();
+        Tlow[i]  = reactions.Tlow();
         Kc[i]    = reactions[i].Kc(p, T);
-        kf[i]    = reactions[i].kf(p, T, c, li);
-        kr[i]    = reactions[i].kr(p, T, c, li);
+        kf[i]    = reactions[i].kf(s);
+        kr[i]    = reactions[i].kr(s);
 
         // arbitrary
         Foam::scalar omegaf = 0.3;
         Foam::scalar omegar = 0.4;
-        omega[i] = reactions[i].omega(p, T, c, li, omegaf, omegar);
+        omega[i] = reactions[i].omega(s, omegaf, omegar);
 
         Foam::scalarField dNdtByV_f(c.size(), 0);
-        reactions[i].dNdtByV(p,
-                             T,
-                             c,
-                             li,
+        reactions[i].dNdtByV(s,
                              dNdtByV_f,
                              false,
                              Foam::List<Foam::label>{},
@@ -174,25 +180,24 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
         dNdtByV[i] =
             std::vector<gScalar>(dNdtByV_f.begin(), dNdtByV_f.end());
 
-        Foam::scalarSquareMatrix ddNdtByVdcTp_f(nEqns, 0);
+        // Reference is (nSpecie + 1)^2 in OpenFOAM-dev's [c, T] layout;
+        // compare with the GPU result via drop_pressure_matrix()
+        Foam::scalarSquareMatrix ddNdtByVdcT_f(nEqnsRef, 0);
 
         dNdtByV_f = 0; // probably not necessary
-        reactions[i].ddNdtByVdcTp(p,
-                                  T,
-                                  c,
-                                  li,
-                                  dNdtByV_f,
-                                  ddNdtByVdcTp_f,
-                                  false,
-                                  c2s,
-                                  csi0,
-                                  Tsi,
-                                  cTpWork0,
-                                  cTpWork1);
+        reactions[i].ddNdtByVdcT(s,
+                                 dNdtByV_f,
+                                 ddNdtByVdcT_f,
+                                 false,
+                                 c2s,
+                                 csi0,
+                                 Tsi,
+                                 cTWork0,
+                                 cTWork1);
 
         ddNdtByVdcTp[i] = std::vector<gScalar>(
-            ddNdtByVdcTp_f.v(),
-            ddNdtByVdcTp_f.v() + ddNdtByVdcTp_f.size());
+            ddNdtByVdcT_f.v(),
+            ddNdtByVdcT_f.v() + ddNdtByVdcT_f.size());
     }
     TestData::reactionResults ret;
     ret.Thigh        = Thigh;
@@ -216,11 +221,12 @@ lu(const std::vector<gScalar>& m_vals,
     Foam::scalarSquareMatrix matrix(size, 0);
     std::copy(m_vals.begin(), m_vals.end(), matrix.v());
     Foam::List<Foam::label> pivot(size, 0);
+    Foam::scalarList        scale(size, Foam::scalar(0));
     Foam::scalarField       source(size);
     std::copy(s_vals.begin(), s_vals.end(), source.begin());
 
     gLabel sign;
-    Foam::LUDecompose(matrix, pivot, sign);
+    Foam::LUDecompose(matrix, pivot, scale, sign);
     Foam::LUBacksubstitute(matrix, pivot, source);
 
     auto m_ret =
@@ -233,17 +239,20 @@ lu(const std::vector<gScalar>& m_vals,
 
 TestData::odeSystemResults odesystem(TestData::Mechanism mech) {
     const gLabel       nSpecie = TestData::speciesCount(mech);
-    const gLabel       nEqns   = TestData::equationCount(mech);
+    // OpenFOAM-dev layout [Y, T]; p is held by the system (pInf)
+    const gLabel       nEqns   = TestData::equationCount(mech) - 1;
     Foam::MockOFSystem system(mech);
+    system.setPressure(TestData::pInf(mech));
 
     TestData::odeSystemResults ret;
 
     const Foam::scalarField y0 = [=]() {
-        gLabel            nEqns = TestData::equationCount(mech);
-        Foam::scalarField y0_t(nEqns);
+        // Fill in the GPU layout [Y, T, p] so that the Y values are
+        // identical to those of the GPU test, then drop p
+        Foam::scalarField y0_t(TestData::equationCount(mech));
         fill_linear(y0_t);
         y0_t[nSpecie]     = TestData::TInf(mech);
-        y0_t[nSpecie + 1] = TestData::pInf(mech);
+        y0_t.setSize(nSpecie + 1);
 
         // std::vector<gScalar> y0_vec =
         // TestData::get_solution_vector(mech);
@@ -278,14 +287,21 @@ std::vector<gScalar> ode_solve(TestData::Mechanism mech,
                                gScalar             dxTry) {
     Foam::dictionary dict;
     dict.add("solver", solver_name);
+    // gpuFoam's Rosenbrock solvers use scaled partial pivoting; OpenFOAM-dev
+    // defaults to unpivoted LU with row filtering, so select pivoting to
+    // compare like with like
+    dict.add("pivot", true);
     Foam::MockOFSystem system(mech);
 
     auto ode = Foam::ODESolver::New(system, dict);
 
     Foam::scalarField y = [&]() {
+        // GPU layout [Y, T, p] -> OpenFOAM-dev layout [Y, T] with p set on
+        // the system
         std::vector<gScalar> v = TestData::get_solution_vector(mech);
-        Foam::scalarField    ret(v.size());
-        std::copy(v.begin(), v.end(), ret.begin());
+        system.setPressure(v.back());
+        Foam::scalarField    ret(v.size() - 1);
+        std::copy(v.begin(), v.end() - 1, ret.begin());
         return ret;
     }();
 
