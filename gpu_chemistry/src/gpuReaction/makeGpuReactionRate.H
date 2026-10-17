@@ -33,14 +33,14 @@ make_thirdBodyEfficiencies(const Foam::speciesTable& species,
         throw std::logic_error(str);
     }
 
+    // Match OpenFOAM-dev b7aa43ca84: default efficiency 1, sparse coeffs
+    // (only non-default entries). Full-length lists still work.
+    for (label i = 0; i < nSpecie; ++i) {
+        efficiencies[i] = 1.0;
+    }
+
     if (dict.found("coeffs")) {
         List<Tuple2<word, scalar>> coeffs(dict.lookup("coeffs"));
-
-        if (nSpecie != coeffs.size()) {
-            throw std::logic_error(
-                "Number of efficiencies is not equal to the "
-                "number of species.");
-        }
 
         forAll(coeffs, i) {
             efficiencies[species[coeffs[i].first()]] =
