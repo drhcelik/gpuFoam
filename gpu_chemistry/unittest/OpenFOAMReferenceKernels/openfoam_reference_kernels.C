@@ -280,6 +280,35 @@ TestData::odeSystemResults odesystem(TestData::Mechanism mech) {
     return ret;
 }
 
+TestData::odeSystemResults odesystem(TestData::Mechanism         mech,
+                                     const std::vector<gScalar>& y0) {
+    const gLabel       nSpecie = TestData::speciesCount(mech);
+    const gLabel       nEqns   = nSpecie + 1;
+    Foam::MockOFSystem system(mech);
+    system.setPressure(y0.back());
+
+    Foam::scalarField y(nEqns);
+    std::copy(y0.begin(), y0.begin() + nEqns, y.begin());
+
+    TestData::odeSystemResults ret;
+    const gLabel               li = 0;
+
+    {
+        Foam::scalarField dy(nEqns, 0.31);
+        system.derivatives(0.0, y, li, dy);
+        ret.derivative = std::vector<gScalar>(dy.begin(), dy.end());
+    }
+
+    {
+        Foam::scalarField        dy(nEqns, 0.31);
+        Foam::scalarSquareMatrix J(nEqns, 0.1);
+        system.jacobian(0.0, y, li, dy, J);
+        ret.jacobian = std::vector<gScalar>(J.v(), J.v() + J.size());
+    }
+
+    return ret;
+}
+
 std::vector<gScalar> ode_solve(TestData::Mechanism mech,
                                std::string         solver_name,
                                gScalar             xStart,

@@ -1,4 +1,5 @@
 #include "catch.H"
+#include <cmath>
 
 #include "openfoam_reference_kernels.H"
 #include "gpu_test_kernels.H"
@@ -690,6 +691,48 @@ TEST_CASE("Test gpuOdeSystem (on GPU)", "[GPU]")
     }
 }
 
+
+
+static inline bool allFinite(const std::vector<gScalar>& v)
+{
+    for (const auto e : v)
+    {
+        if (!std::isfinite(e)) return false;
+    }
+    return true;
+}
+
+
+TEST_CASE("Test gpuOdeSystem fractional orders at zero concentration (on CPU)", "[CPU]")
+{
+    using namespace FoamGpu;
+
+    constexpr double errorTol = 1E-9;
+
+    // CH4^0.2 O2^1.3 with Y_CH4 = 0: d(c^0.2)/dc is singular at c = 0,
+    // OpenFOAM-dev evaluates it at max(c, small) (dpowdc)
+    const auto mech = TestData::Mechanism::CH4_1STEP;
+    const auto y0 = TestData::get_solution_vector(mech);
+
+    auto test_result = CpuTestKernels::odesystem(mech, y0);
+    auto reference = OFReferenceKernels::odesystem(mech, y0);
+
+    CHECK(allFinite(test_result.derivative));
+    CHECK(allFinite(test_result.jacobian));
+    CHECK(allFinite(reference.jacobian));
+
+    CHECK_THAT
+    (
+        drop_pressure(test_result.derivative),
+        Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
+    );
+
+    CHECK_THAT
+    (
+        drop_pressure_matrix(test_result.jacobian),
+        Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
+    );
+}
 
 
 TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")

@@ -415,9 +415,7 @@ inline CUDA_HOSTDEV device_array<gScalar, MAX_REACTION_WIDTH>
             const auto& el = llhs[i].exponent;
             const auto& si = llhs[i].index;
             if (i == j) {
-                dCfdcj *=
-                    el * speciePow(c[si],
-                                   el - gpuSpecieExponent(gLabel(1)));
+                dCfdcj *= dpowdc(c[si], el);
             } else {
                 dCfdcj *= lhsPow[i];
             }
@@ -456,9 +454,7 @@ inline CUDA_HOSTDEV device_array<gScalar, MAX_REACTION_WIDTH>
             const auto& er = rrhs[i].exponent;
             const auto& si = rrhs[i].index;
             if (i == j) {
-                dCrdcj *=
-                    er * speciePow(c[si],
-                                   er - gpuSpecieExponent(gLabel(1)));
+                dCrdcj *= dpowdc(c[si], er);
             } else {
                 dCrdcj *= rhsPow[i];
             }

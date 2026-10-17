@@ -109,4 +109,31 @@ inline CUDA_HOSTDEV gScalar speciePow(const gScalar            x,
     }
 }
 
+/// @brief Derivative of speciePow(c, e) w.r.t. c, mirroring
+/// Foam::dpowdc (OpenFOAM-dev specieExponentI.H).  A zero exponent gives
+/// 0, and exponents below 1 are evaluated at max(c, small) to avoid the
+/// singularity at c = 0, where small = gpuSmall = OpenFOAM's
+/// doubleScalarSmall (machine epsilon).
+inline CUDA_HOSTDEV gScalar dpowdc(const gScalar            c,
+                                   const gpuSpecieExponent& e) {
+    if (e.hasIntegerExponent()) {
+        if (e.integerExponent_ >= 1) {
+            return e.integerExponent_ *
+                   integerPow(c, e.integerExponent_ - 1);
+        } else // (e.integerExponent_ == 0)
+        {
+            return 0;
+        }
+    } else {
+        if (e.scalarExponent_ >= 1) {
+            return e.scalarExponent_ * pow(c, e.scalarExponent_ - 1);
+        } else if (e.scalarExponent_ == 0) {
+            return 0;
+        } else {
+            return e.scalarExponent_ *
+                   pow(fmax(c, gpuSmall), e.scalarExponent_ - 1);
+        }
+    }
+}
+
 } // namespace FoamGpu

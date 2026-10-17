@@ -27,6 +27,11 @@ lu(const std::vector<gScalar>& m_vals,
 
 TestData::odeSystemResults odesystem(TestData::Mechanism mech);
 
+//- Reference derivative and Jacobian at the given state, given in the GPU
+//  layout [Y, T, p]; the results are in the OpenFOAM-dev layout [Y, T]
+TestData::odeSystemResults odesystem(TestData::Mechanism         mech,
+                                     const std::vector<gScalar>& y0);
+
 std::vector<gScalar> ode_solve(TestData::Mechanism mech,
                                std::string         solver_name,
                                gScalar             xStart,

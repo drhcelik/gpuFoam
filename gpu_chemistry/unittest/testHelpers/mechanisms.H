@@ -6,7 +6,7 @@
 
 namespace TestData {
 
-enum Mechanism { GRI, H2, YAO };
+enum Mechanism { GRI, H2, YAO, CH4_1STEP };
 
 static inline gLabel speciesCount(Mechanism m) {
 
@@ -14,6 +14,7 @@ static inline gLabel speciesCount(Mechanism m) {
     case Mechanism::GRI: return 53;
     case Mechanism::YAO: return 54;
     case Mechanism::H2: return 10;
+    case Mechanism::CH4_1STEP: return 5;
     default: throw std::logic_error("Invalid mechanism");
     }
 }
@@ -28,6 +29,7 @@ static inline gScalar pInf(Mechanism m) {
     case Mechanism::GRI: return 1.36789e+06;
     case Mechanism::YAO: return 1.36789e+06;
     case Mechanism::H2: return 202650.0;
+    case Mechanism::CH4_1STEP: return 101325.0;
     default: throw std::logic_error("Invalid mechanism");
     }
 }
@@ -103,6 +105,30 @@ template <class T> static inline void assign_yao(T& f) {
     f[nSpecie + 1] = p_inf;
 }
 
+// Global one-step CH4 mechanism with fractional orders (CH4^0.2 O2^1.3).
+// The CH4 mass fraction is zero so that the Jacobian exercises the
+// fractional-exponent derivative at c = 0.
+template <class T> static inline void assign_ch4_1step(T& f) {
+
+    constexpr int CH4_idx = 0;
+    constexpr int O2_idx  = 1;
+    constexpr int CO2_idx = 2;
+    constexpr int H2O_idx = 3;
+    constexpr int N2_idx  = 4;
+
+    gLabel nSpecie = speciesCount(CH4_1STEP);
+
+    for (auto& e : f) { e = 0.0; }
+    f[CH4_idx] = 0.0;
+    f[O2_idx]  = 0.2;
+    f[CO2_idx] = 0.05;
+    f[H2O_idx] = 0.05;
+    f[N2_idx]  = 0.7;
+
+    f[nSpecie]     = TInf(Mechanism::CH4_1STEP);
+    f[nSpecie + 1] = pInf(Mechanism::CH4_1STEP);
+}
+
 template <class T>
 static inline void assign_test_condition(T& f, Mechanism m) {
     if (gLabel(f.size()) != equationCount(m)) {
@@ -113,6 +139,7 @@ static inline void assign_test_condition(T& f, Mechanism m) {
     case Mechanism::GRI: assign_gri(f); return;
     case Mechanism::YAO: assign_yao(f); return;
     case Mechanism::H2: assign_h2(f); return;
+    case Mechanism::CH4_1STEP: assign_ch4_1step(f); return;
     default: throw std::logic_error("Invalid mechanism");
     }
 }

@@ -26,12 +26,21 @@ static const char* H2_THERMOS =
 #include "h2_thermos.h"
     ;
 
+static const char* CH4_1STEP_REACTIONS =
+#include "ch4_1step_reactions.h"
+    ;
+
+static const char* CH4_1STEP_THERMOS =
+#include "ch4_1step_thermos.h"
+    ;
+
 Foam::dictionary makeThermoDict(TestData::Mechanism m) {
     std::string t_str = [m]() {
         switch (m) {
         case Mechanism::GRI: return std::string(GRI_THERMOS);
         case Mechanism::YAO: return std::string(YAO_THERMOS);
         case Mechanism::H2: return std::string(H2_THERMOS);
+        case Mechanism::CH4_1STEP: return std::string(CH4_1STEP_THERMOS);
         default: throw std::logic_error("Invalid mechanism");
         }
     }();
@@ -85,6 +94,7 @@ Foam::dictionary makeReactionDict(TestData::Mechanism m) {
         case Mechanism::GRI: return std::string(GRI_REACTIONS);
         case Mechanism::YAO: return std::string(YAO_REACTIONS);
         case Mechanism::H2: return std::string(H2_REACTIONS);
+        case Mechanism::CH4_1STEP: return std::string(CH4_1STEP_REACTIONS);
         default: throw std::logic_error("Invalid mechanism");
         }
     }();
