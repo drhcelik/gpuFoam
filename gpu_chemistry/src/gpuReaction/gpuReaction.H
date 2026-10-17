@@ -232,22 +232,6 @@ public:
         jac_dCdC_contribution(p, T, r, c, ddNdtByVdcTp);
     }
 
-    /// @brief Checks if any of the species involved in the LHS of
-    /// this reaction has small (< gpuSmall) concentrations.
-    /// @param c A span of concentrations in a cell.
-    /// @return True if any of the concentrations on the LHS of this
-    /// reaction have small values. False otherwise.
-    inline CUDA_HOSTDEV bool
-    lhsSmallConcentration(const mdspan<const gScalar, 1> c) const;
-
-    /// @brief Checks if any of the species involved in the LHS of
-    /// this reaction has small (< gpuSmall) concentrations.
-    /// @param c A span of concentrations in a cell.
-    /// @return True if any of the concentrations on the LHS of this
-    /// reaction have small values. False otherwise.
-    inline CUDA_HOSTDEV bool
-    rhsSmallConcentration(const mdspan<const gScalar, 1> c) const;
-
     /// @brief Computes the powers speciePow(c_i, e_i) of the LHS
     /// specie concentrations.
     /// @param c A span of concentrations in a cell.
@@ -324,26 +308,6 @@ public:
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-
-inline CUDA_HOSTDEV bool gpuReaction::lhsSmallConcentration(
-    const mdspan<const gScalar, 1> c) const {
-    const auto llhs = lhs();
-    for (size_t i = 0; i < llhs.size(); ++i) {
-        const auto& si = llhs[i].index;
-        if (c[si] < gpuSmall) { return true; }
-    }
-    return false;
-}
-
-inline CUDA_HOSTDEV bool gpuReaction::rhsSmallConcentration(
-    const mdspan<const gScalar, 1> c) const {
-    const auto rrhs = rhs();
-    for (size_t i = 0; i < rrhs.size(); ++i) {
-        const auto& si = rrhs[i].index;
-        if (c[si] < gpuSmall) { return true; }
-    }
-    return false;
-}
 
 inline CUDA_HOSTDEV device_array<gScalar, MAX_REACTION_WIDTH>
 gpuReaction::lhsPowers(const mdspan<const gScalar, 1> c) const {
