@@ -171,12 +171,12 @@ public:
 
     /// @brief Get the current cell-specific chemical time scales.
     /// @return Field of cell-specific chemical time scales.
-    tmp<volScalarField> tc() const override;
+    tmp<volScalarField::Internal> tc() const override;
 
     /// @brief Return the current heat release rates corresponding to the
     /// reaction rates (RR_).
     /// @return The heat release rate [kg/m/s^3].
-    tmp<volScalarField> Qdot() const override;
+    tmp<volScalarField::Internal> Qdot() const override;
 
     // Member Operators
 

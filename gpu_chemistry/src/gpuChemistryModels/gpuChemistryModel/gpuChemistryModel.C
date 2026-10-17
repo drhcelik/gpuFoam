@@ -156,7 +156,8 @@ void gpuChemistryModel<cpuThermoType>::calculate() {
 
     const PtrList<volScalarField>& Yvf = this->thermo().Y();
 
-    scalarField c(this->nSpecie());
+    reaction::state rs(this->nSpecie());
+    scalarField&    c = rs.c;
 
     List<label> cTos; // Note! not allocated!
 
@@ -170,10 +171,12 @@ void gpuChemistryModel<cpuThermoType>::calculate() {
             c[i]            = rho * Yi / specieThermos_[i].W();
         }
 
+        rs.reset(p, T, celli);
+
         dNdtByV = Zero;
 
         forAll(reactions_, ri) {
-            reactions_[ri].dNdtByV(p, T, c, celli, dNdtByV, false, cTos, 0);
+            reactions_[ri].dNdtByV(rs, dNdtByV, false, cTos, 0);
         }
 
         for (label i = 0; i < this->nSpecie(); i++) {
@@ -208,7 +211,8 @@ gpuChemistryModel<cpuThermoType>::reactionRR(const label reactioni) const {
 
     const PtrList<volScalarField>& Yvf = this->thermo().Y();
 
-    scalarField c(this->nSpecie());
+    reaction::state rs(this->nSpecie());
+    scalarField&    c = rs.c;
 
     forAll(rhovf, celli)
     {
@@ -222,15 +226,14 @@ gpuChemistryModel<cpuThermoType>::reactionRR(const label reactioni) const {
             c[i] = rho*Yi/specieThermos_[i].W();
         }
 
+        rs.reset(p, T, celli);
+
         scalar omegaf, omegar;
 
         RR[celli] =
             R.omega
             (
-                p,
-                T,
-                c,
-                celli,
+                rs,
                 omegaf,
                 omegar
             );
@@ -278,7 +281,8 @@ gpuChemistryModel<cpuThermoType>::specieReactionRR(const label reactioni) const 
     const auto& R = reactions_[reactioni];
 
     List<label> cTos; // Note! not allocated!
-    scalarField c(this->nSpecie());
+    reaction::state rs(this->nSpecie());
+    scalarField&    c = rs.c;
 
 
     forAll(rhovf, celli)
@@ -293,14 +297,13 @@ gpuChemistryModel<cpuThermoType>::specieReactionRR(const label reactioni) const 
             c[i] = rho*Yi/specieThermos_[i].W();
         }
 
+        rs.reset(p, T, celli);
+
         dNdtByV = Zero;
 
         R.dNdtByV
         (
-            p,
-            T,
-            c,
-            celli,
+            rs,
             dNdtByV,
             false,
             cTos,
@@ -364,18 +367,15 @@ scalar gpuChemistryModel<cpuThermoType>::computeRRAndChemDeltaT(const scalar& de
 }
 
 template<class cpuThermoType>
-tmp<volScalarField> gpuChemistryModel<cpuThermoType>::tc() const {
-    tmp<volScalarField> ttc(volScalarField::New(
+tmp<volScalarField::Internal>
+gpuChemistryModel<cpuThermoType>::tc() const {
+    tmp<volScalarField::Internal> ttc(volScalarField::Internal::New(
         "tc",
         this->mesh(),
-        dimensionedScalar(dimTime, small),
-        extrapolatedCalculatedFvPatchScalarField::typeName));
-    scalarField&        tc = ttc.ref();
+        dimensionedScalar(dimensions::time, small)));
+    scalarField& tc = ttc.ref();
 
-    if (!this->chemistry_) {
-        ttc.ref().correctBoundaryConditions();
-        return ttc;
-    }
+    if (!this->chemistry_) { return ttc; }
 
     tmp<volScalarField>   trhovf(this->thermo().rho());
     const volScalarField& rhovf = trhovf();
@@ -387,7 +387,8 @@ tmp<volScalarField> gpuChemistryModel<cpuThermoType>::tc() const {
 
     const PtrList<volScalarField>& Yvf = this->thermo().Y();
 
-    scalarField c(this->nSpecie());
+    reaction::state rs(this->nSpecie());
+    scalarField&    c = rs.c;
 
     List<label> cTos; // Note! not allocated!
 
@@ -399,6 +400,8 @@ tmp<volScalarField> gpuChemistryModel<cpuThermoType>::tc() const {
         for (label i = 0; i < this->nSpecie(); i++) {
             c[i] = rho * Yvf[i][celli] / specieThermos_[i].W();
         }
+
+        rs.reset(p, T, celli);
 
         // A reaction's rate scale is calculated as it's molar
         // production rate divided by the total number of moles in the
@@ -421,15 +424,15 @@ tmp<volScalarField> gpuChemistryModel<cpuThermoType>::tc() const {
         forAll(reactions_, i) {
             const Reaction<cpuThermoType>& R = reactions_[i];
             scalar                         omegaf, omegar;
-            R.omega(p, T, c, celli, omegaf, omegar);
+            R.omega(rs, omegaf, omegar);
 
             scalar wf = 0;
-            forAll(R.rhs(), s) { wf += R.rhs()[s].stoichCoeff * omegaf; }
+            forAll(R.rhs(), j) { wf += R.rhs()[j].stoichCoeff * omegaf; }
             sumW += wf;
             sumWRateByCTot += sqr(wf);
 
             scalar wr = 0;
-            forAll(R.lhs(), s) { wr += R.lhs()[s].stoichCoeff * omegar; }
+            forAll(R.lhs(), j) { wr += R.lhs()[j].stoichCoeff * omegar; }
             sumW += wr;
             sumWRateByCTot += sqr(wr);
         }
@@ -438,16 +441,16 @@ tmp<volScalarField> gpuChemistryModel<cpuThermoType>::tc() const {
             sumWRateByCTot == 0 ? vGreat : sumW / sumWRateByCTot * sum(c);
     }
 
-    ttc.ref().correctBoundaryConditions();
     return ttc;
 }
 
 template<class cpuThermoType>
-tmp<volScalarField> gpuChemistryModel<cpuThermoType>::Qdot() const {
-    tmp<volScalarField> tQdot(volScalarField::New(
+tmp<volScalarField::Internal>
+gpuChemistryModel<cpuThermoType>::Qdot() const {
+    tmp<volScalarField::Internal> tQdot(volScalarField::Internal::New(
         "Qdot",
         this->mesh_,
-        dimensionedScalar(dimEnergy / dimVolume / dimTime, 0)));
+        dimensionedScalar(dimensions::powerDensity, 0)));
 
     if (!this->chemistry_) { return tQdot; }
 
