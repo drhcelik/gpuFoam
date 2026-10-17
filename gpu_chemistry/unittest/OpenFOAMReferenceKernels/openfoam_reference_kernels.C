@@ -137,7 +137,6 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
     // OpenFOAM-dev reaction Jacobian layout: [c_0..c_{n-1}, T]
     const gLabel       nEqnsRef = nSpecie + 1;
     Foam::List<gLabel> c2s;
-    gLabel             csi0 = 0;
     gLabel             Tsi  = nSpecie;
     Foam::scalarField  cTWork0(nEqnsRef, 0);
     Foam::scalarField  cTWork1(nEqnsRef, 0);
@@ -175,8 +174,7 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
         reactions[i].dNdtByV(s,
                              dNdtByV_f,
                              false,
-                             Foam::List<Foam::label>{},
-                             0);
+                             Foam::List<Foam::label>{});
         dNdtByV[i] =
             std::vector<gScalar>(dNdtByV_f.begin(), dNdtByV_f.end());
 
@@ -190,7 +188,6 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
                                  ddNdtByVdcT_f,
                                  false,
                                  c2s,
-                                 csi0,
                                  Tsi,
                                  cTWork0,
                                  cTWork1);

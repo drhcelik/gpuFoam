@@ -94,7 +94,7 @@ public:
         // Evaluate contributions from reactions
         dYTdt = Zero;
         forAll(reactions_, ri) {
-            reactions_[ri].dNdtByV(s_, dYTdt, reduction_, cTos_, 0);
+            reactions_[ri].dNdtByV(s_, dYTdt, reduction_, cTos_);
         }
 
         // Reactions return dNdtByV, so we need to convert the result
@@ -194,7 +194,6 @@ public:
                                        ddNdtByVdcT,
                                        reduction_,
                                        cTos_,
-                                       0,
                                        nSpecie_,
                                        YTWork_[1],
                                        YTWork_[2]);

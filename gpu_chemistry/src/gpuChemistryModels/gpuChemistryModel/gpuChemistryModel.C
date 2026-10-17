@@ -176,7 +176,7 @@ void gpuChemistryModel<cpuThermoType>::calculate() {
         dNdtByV = Zero;
 
         forAll(reactions_, ri) {
-            reactions_[ri].dNdtByV(rs, dNdtByV, false, cTos, 0);
+            reactions_[ri].dNdtByV(rs, dNdtByV, false, cTos);
         }
 
         for (label i = 0; i < this->nSpecie(); i++) {
@@ -306,8 +306,7 @@ gpuChemistryModel<cpuThermoType>::specieReactionRR(const label reactioni) const 
             rs,
             dNdtByV,
             false,
-            cTos,
-            0
+            cTos
         );
 
         for (label i=0; i<this->nSpecie(); i++)
