@@ -470,12 +470,12 @@ gpuReaction::omega(const gScalar                  p,
                    const gScalar                  T,
                    const mdspan<const gScalar, 1> c) const {
 
-    const gScalar clippedT =
-        fmin(fmax(T, this->Tlow()), this->Thigh());
+    // T is limited by the caller (gpuODESystem), as in OpenFOAM-dev where
+    // Reaction::omega no longer limits T (04a878d167)
 
     // Rate constants
-    const gScalar kf = this->kf(p, clippedT, c);
-    const gScalar kr = this->kr(kf, p, clippedT, this->Kc(p, clippedT), c);
+    const gScalar kf = this->kf(p, T, c);
+    const gScalar kr = this->kr(kf, p, T, this->Kc(p, T), c);
 
     const gScalar Cf = calcCf(lhsPowers(c));
     const gScalar Cr = calcCr(rhsPowers(c));

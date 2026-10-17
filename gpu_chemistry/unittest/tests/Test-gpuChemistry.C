@@ -735,6 +735,44 @@ TEST_CASE("Test gpuOdeSystem fractional orders at zero concentration (on CPU)", 
 }
 
 
+TEST_CASE("Test gpuOdeSystem temperature limits (on CPU)", "[CPU]")
+{
+    using namespace FoamGpu;
+
+    constexpr double errorTol = 1E-9;
+
+    // OpenFOAM-dev clamps a local copy of T to the reaction scheme's
+    // [Tlow, Thigh] = [200, 5000] in Standard::derivatives and ::jacobian
+    // and uses it for both the thermo and the reaction rates
+    const auto mech = TestData::Mechanism::H2;
+    const auto nSpecie = TestData::speciesCount(mech);
+
+    for (const gScalar T : {6000.0, 150.0})
+    {
+        DYNAMIC_SECTION("T = " << T)
+        {
+            auto y0 = TestData::get_solution_vector(mech);
+            y0[nSpecie] = T;
+
+            auto test_result = CpuTestKernels::odesystem(mech, y0);
+            auto reference = OFReferenceKernels::odesystem(mech, y0);
+
+            CHECK_THAT
+            (
+                drop_pressure(test_result.derivative),
+                Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
+            );
+
+            CHECK_THAT
+            (
+                drop_pressure_matrix(test_result.jacobian),
+                Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
+            );
+        }
+    }
+}
+
+
 TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
 {
     using namespace FoamGpu;

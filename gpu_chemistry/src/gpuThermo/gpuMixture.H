@@ -35,9 +35,20 @@ struct gpuMixture {
                             mdspan<gScalar, 1>             Cp,
                             mdspan<gScalar, 1>             Ha,
                             mdspan<gScalar, 1>             c) {
+        return computeJacobianRequired(y, y[y.size() - 2], Cp, Ha, c);
+    }
+
+    /// @brief As above but evaluated at the given temperature T rather
+    /// than the temperature in y (e.g. a temperature clamped to the
+    /// reaction scheme limits).
+    CUDA_HOSTDEV device_array<gScalar, 4>
+    computeJacobianRequired(const mdspan<const gScalar, 1> y,
+                            const gScalar                  T,
+                            mdspan<gScalar, 1>             Cp,
+                            mdspan<gScalar, 1>             Ha,
+                            mdspan<gScalar, 1>             c) {
 
         const gLabel  nSpecie = y.size() - 2;
-        const gScalar T       = y[nSpecie];
         const gScalar p       = y[nSpecie + 1];
 
         gScalar rhoM   = 0.0;
@@ -89,9 +100,19 @@ struct gpuMixture {
     computeDerivativeRequired(const mdspan<const gScalar, 1> y,
                               mdspan<gScalar, 1>             Ha,
                               mdspan<gScalar, 1>             c) {
+        return computeDerivativeRequired(y, y[y.size() - 2], Ha, c);
+    }
+
+    /// @brief As above but evaluated at the given temperature T rather
+    /// than the temperature in y (e.g. a temperature clamped to the
+    /// reaction scheme limits).
+    CUDA_HOSTDEV device_array<gScalar, 2>
+    computeDerivativeRequired(const mdspan<const gScalar, 1> y,
+                              const gScalar                  T,
+                              mdspan<gScalar, 1>             Ha,
+                              mdspan<gScalar, 1>             c) {
 
         const gLabel  nSpecie = y.size() - 2;
-        const gScalar T       = y[nSpecie];
         const gScalar p       = y[nSpecie + 1];
 
         gScalar rhoM = 0.0;

@@ -161,6 +161,16 @@ public:
 
     CUDA_HOSTDEV gLabel nReactions() const { return nReactions_; }
 
+    /// @brief Limit T to the reaction scheme's [Tlow, Thigh], as
+    /// chemistryModels::Standard::derivatives/jacobian in OpenFOAM-dev
+    /// (9dfdc49d8e).  The limits are scheme-wide, so are taken from the
+    /// first reaction.
+    CUDA_HOSTDEV gScalar limitT(const gScalar T) const {
+        if (nReactions() == 0) { return T; }
+        const auto& r = reactions()[0];
+        return fmin(fmax(T, r.Tlow()), r.Thigh());
+    }
+
     CUDA_HOSTDEV void derivatives(const mdspan<const gScalar, 1> y,
                                   mdspan<gScalar, 1>             dydx,
                                   gpuBuffer& buffer) const {
@@ -169,14 +179,16 @@ public:
 
         const gLabel nSpecie = nEqns() - 2;
 
-        const gScalar T = y[nSpecie];
+        // Local copy of T limited to the reaction scheme limits, used for
+        // both the thermo and the reaction rates; y is not modified
+        const gScalar T = limitT(y[nSpecie]);
         const gScalar p = y[nSpecie + 1];
 
         gpuMixture mixture(thermos_);
         auto       Ha = buffer.tempField1();
         auto       c  = buffer.c();
 
-        const auto pair = mixture.computeDerivativeRequired(y, Ha, c);
+        const auto pair = mixture.computeDerivativeRequired(y, T, Ha, c);
         const auto rhoM = pair[0];
         const auto CpM = pair[1]; 
 
@@ -210,7 +222,9 @@ public:
 
         const gLabel nSpecie = nEqns() - 2;
 
-        const gScalar T = y[nSpecie];
+        // Local copy of T limited to the reaction scheme limits, used for
+        // both the thermo and the reaction rates; y is not modified
+        const gScalar T = limitT(y[nSpecie]);
         const gScalar p = y[nSpecie + 1];
 
         gpuMixture mixture(thermos_);
@@ -218,7 +232,7 @@ public:
         auto       Ha = buffer.tempField2();
         auto       c  = buffer.c();
 
-        const auto arr = mixture.computeJacobianRequired(y, Cp, Ha, c);
+        const auto arr = mixture.computeJacobianRequired(y, T, Cp, Ha, c);
         const auto rhoM = arr[0];
         const auto CpM = arr[1];
         const auto dCpMdT = arr[2];
