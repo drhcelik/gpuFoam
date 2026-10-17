@@ -8,6 +8,10 @@
 #include "mechanisms.H"
 #include "mdspan.H"
 #include "gpuSpecieExponent.H"
+#include "makeGpuReactionRate.H"
+#include "reaction.H"
+#include "thirdBodyEfficiencies.H"
+#include "IStringStream.H"
 
 
 TEST_CASE("make_mdspan", "[CPU]"){
@@ -782,6 +786,60 @@ TEST_CASE("Test isInteger (on CPU)", "[CPU]")
     CHECK(FoamGpu::isInteger(0.0));
     CHECK(FoamGpu::isInteger(2.0));
     CHECK(!FoamGpu::isInteger(0.2));
+}
+
+
+TEST_CASE("Test gpuThirdBodyEfficiencies (on CPU)", "[CPU]")
+{
+    using namespace FoamGpu;
+
+    constexpr double errorTol = 1E-12;
+
+    // OpenFOAM-dev 852bc45364 / 385d6e7e64: defaultEfficiency with an
+    // efficiencies list or a single efficiency entry
+    const Foam::wordList names({"H2", "O2", "H2O", "N2"});
+    const Foam::speciesTable species(names);
+
+    const std::vector<gScalar> c = {0.3, 0.7, 1.1, 2.9};
+    Foam::scalarField cf(c.size());
+    forAll(cf, i)
+    {
+        cf[i] = c[i];
+    }
+    Foam::reaction::state s(species.size());
+    s.reset(1e5, 1000, cf, 0);
+
+    const std::vector<std::string> dicts =
+    {
+        "defaultEfficiency 0.5; efficiencies 2((H2O 6.3)(N2 0.5));",
+        "defaultEfficiency 2; efficiency (H2O 0);",
+        "defaultEfficiency 0.75;",
+        "defaultEfficiency 1; efficiencies 4((H2 2)(O2 1)(H2O 6)(N2 1));"
+    };
+
+    for (const auto& d : dicts)
+    {
+        DYNAMIC_SECTION(d)
+        {
+            const Foam::dictionary dict((Foam::IStringStream(d))());
+
+            const Foam::thirdBodyEfficiencies ref(species, dict);
+            const auto test = make_thirdBodyEfficiencies(species, dict);
+
+            const auto cs = make_mdspan(c, extents<1>(c.size()));
+
+            CHECK(test.M(cs) == Approx(ref.M(s)).epsilon(errorTol));
+
+            const auto& dMdc = test.dMdc(cs);
+            gScalar M = 0;
+            for (size_t i = 0; i < c.size(); ++i)
+            {
+                CHECK(dMdc[i] == Approx(ref.dMdc()[i]).epsilon(errorTol));
+                M += dMdc[i]*c[i];
+            }
+            CHECK(test.M(cs) == Approx(M).epsilon(errorTol));
+        }
+    }
 }
 
 

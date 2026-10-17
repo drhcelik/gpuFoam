@@ -45,7 +45,8 @@ R"(reactions
         }
         thirdBodyEfficiencies
         {
-            coeffs
+            defaultEfficiency 1;
+            efficiencies
 10
 (
 (H2 0)
@@ -83,7 +84,8 @@ R"(reactions
         }
         thirdBodyEfficiencies
         {
-            coeffs
+            defaultEfficiency 1;
+            efficiencies
 10
 (
 (H2 0)
@@ -121,7 +123,8 @@ R"(reactions
         }
         thirdBodyEfficiencies
         {
-            coeffs
+            defaultEfficiency 1;
+            efficiencies
 10
 (
 (H2 1)
@@ -159,7 +162,8 @@ R"(reactions
         }
         thirdBodyEfficiencies
         {
-            coeffs
+            defaultEfficiency 1;
+            efficiencies
 10
 (
 (H2 0)
@@ -239,7 +243,8 @@ R"(reactions
         A               1e+12;
         beta            -1;
         Ta              0;
-        coeffs
+        defaultEfficiency 1;
+        efficiencies
 10
 (
 (H2 0)
@@ -278,7 +283,8 @@ R"(reactions
         A               2.21e+16;
         beta            -2;
         Ta              0;
-        coeffs
+        defaultEfficiency 1;
+        efficiencies
 10
 (
 (H2 1)
@@ -301,7 +307,8 @@ R"(reactions
         A               4.71e+12;
         beta            -1;
         Ta              0;
-        coeffs
+        defaultEfficiency 1;
+        efficiencies
 10
 (
 (H2 1)
@@ -324,7 +331,8 @@ R"(reactions
         A               18900000;
         beta            0;
         Ta              -899.705935;
-        coeffs
+        defaultEfficiency 1;
+        efficiencies
 10
 (
 (H2 1)
@@ -381,7 +389,8 @@ R"(reactions
         }
         thirdBodyEfficiencies
         {
-            coeffs
+            defaultEfficiency 1;
+            efficiencies
 10
 (
 (H2 1)

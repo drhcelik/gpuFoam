@@ -11,30 +11,34 @@ public:
     using idxArray = device_array<gLabel, 300>;
 
     gLabel   nSpecie_{};
-    gLabel   nNonUnity_{};
+    gScalar  defaultEfficiency_{1};
+    gLabel   nNonDefault_{};
     effArray efficiencies_{};
-    idxArray nonUnitySpecies_{};
-    effArray nonUnityEfficienciesM1_{};
+    idxArray nonDefaultSpecies_{};
+    effArray nonDefaultEfficienciesMdefault_{};
 
     gpuThirdBodyEfficiencies() = default;
 
-    /// Construct from a full efficiency table (default 1). Builds the
-    /// sparse non-unity lists used by M, matching OpenFOAM-dev
-    /// 76dc82d590 (M = sum(c) + sum((eff-1)*c_i) for non-unity species).
+    /// Construct from a full efficiency table and the default efficiency.
+    /// Builds the sparse lists of the species whose efficiency differs from
+    /// the default, used by M, matching OpenFOAM-dev 852bc45364
+    /// (M = defaultEfficiency*sum(c) + sum((eff-defaultEfficiency)*c_i)).
     inline gpuThirdBodyEfficiencies(gLabel          nSpecie,
-                                    const effArray& efficiencies)
+                                    const effArray& efficiencies,
+                                    gScalar defaultEfficiency = gScalar(1))
         : nSpecie_(nSpecie)
-        , nNonUnity_(0)
+        , defaultEfficiency_(defaultEfficiency)
+        , nNonDefault_(0)
         , efficiencies_(efficiencies)
     {
         for (gLabel i = 0; i < nSpecie_; ++i)
         {
-            if (efficiencies_[i] != gScalar(1))
+            if (efficiencies_[i] != defaultEfficiency_)
             {
-                nonUnitySpecies_[nNonUnity_] = i;
-                nonUnityEfficienciesM1_[nNonUnity_] =
-                    efficiencies_[i] - gScalar(1);
-                ++nNonUnity_;
+                nonDefaultSpecies_[nNonDefault_] = i;
+                nonDefaultEfficienciesMdefault_[nNonDefault_] =
+                    efficiencies_[i] - defaultEfficiency_;
+                ++nNonDefault_;
             }
         }
     }
@@ -42,20 +46,23 @@ public:
     ///
     ///@brief Computes the concentration of the third-bodies.
     ///
-    /// OpenFOAM-dev 76dc82d590: M = C + sum((eff-1)*c_i) over non-unity
-    /// species, with C = sum(c). Numerically equal to sum(eff_i*c_i).
+    /// OpenFOAM-dev 852bc45364: M = defaultEfficiency*C
+    /// + sum((eff-defaultEfficiency)*c_i) over the species whose efficiency
+    /// differs from the default, with C = sum(c). Numerically equal to
+    /// sum(eff_i*c_i).
     ///
     ///@param c Concentration.
     ///@return gScalar The concentration of the third-bodies.
     ///
     inline CUDA_HOSTDEV gScalar
     M(const mdspan<const gScalar, 1> c) const {
-        gScalar M = 0;
+        gScalar C = 0;
         for (gLabel i = 0; i < nSpecie_; ++i) {
-            M += c[i];
+            C += c[i];
         }
-        for (gLabel i = 0; i < nNonUnity_; ++i) {
-            M += nonUnityEfficienciesM1_[i] * c[nonUnitySpecies_[i]];
+        gScalar M = defaultEfficiency_ * C;
+        for (gLabel i = 0; i < nNonDefault_; ++i) {
+            M += nonDefaultEfficienciesMdefault_[i] * c[nonDefaultSpecies_[i]];
         }
         return M;
     }

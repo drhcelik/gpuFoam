@@ -33,29 +33,36 @@ make_thirdBodyEfficiencies(const Foam::speciesTable& species,
         throw std::logic_error(str);
     }
 
-    // Match OpenFOAM-dev b7aa43ca84 / 76dc82d590: default efficiency 1,
-    // sparse coeffs (only non-default entries). Full-length lists and a
-    // defaultEfficiency fallback still work; the constructor builds the
-    // non-unity lists used by the optimised M evaluation.
+    // Match OpenFOAM-dev 852bc45364 / 385d6e7e64: defaultEfficiency is
+    // required, together with either a single efficiency entry or an
+    // optional efficiencies list of the species whose efficiency differs
+    // from the default.
+    const scalar defaultEff = dict.lookup<scalar>("defaultEfficiency");
+
     for (label i = 0; i < nSpecie; ++i) {
-        efficiencies[i] = 1.0;
+        efficiencies[i] = defaultEff;
     }
 
-    if (dict.found("coeffs")) {
-        List<Tuple2<word, scalar>> coeffs(dict.lookup("coeffs"));
+    const List<Tuple2<word, scalar>> effs
+    (
+        dict.found("efficiency")
+      ? List<Tuple2<word, scalar>>
+        (
+            1,
+            dict.lookup<Tuple2<word, scalar>>("efficiency")
+        )
+      : dict.lookupOrDefault<List<Tuple2<word, scalar>>>
+        (
+            "efficiencies",
+            List<Tuple2<word, scalar>>()
+        )
+    );
 
-        forAll(coeffs, i) {
-            efficiencies[species[coeffs[i].first()]] =
-                coeffs[i].second();
-        }
-    } else {
-        scalar defaultEff = dict.lookup<scalar>("defaultEfficiency");
-        for (label i = 0; i < nSpecie; ++i) {
-            efficiencies[i] = defaultEff;
-        }
+    forAll(effs, i) {
+        efficiencies[species[effs[i].first()]] = effs[i].second();
     }
 
-    return gpuThirdBodyEfficiencies(nSpecie, efficiencies);
+    return gpuThirdBodyEfficiencies(nSpecie, efficiencies, defaultEff);
 }
 
 static gpu::ThirdBodyArrhenius
