@@ -6,6 +6,7 @@
 #include "gpuArrheniusReactionRate.H"
 #include "gpuChemicallyActivatedReactionRate.H"
 #include "gpuFallOffReactionRate.H"
+#include "gpuLandauTellerReactionRate.H"
 #include "gpuLindemannFallOffFunction.H"
 #include "gpuSRIFallOffFunction.H"
 #include "gpuThirdBodyArrheniusReactionRate.H"
@@ -17,6 +18,7 @@ namespace gpu {
 
 using Arrhenius          = gpuArrheniusReactionRate;
 using ThirdBodyArrhenius = gpuThirdBodyArrheniusReactionRate;
+using LandauTeller       = gpuLandauTellerReactionRate;
 using ArrheniusLindemannFallOff =
     gpuFallOffReactionRate<gpuArrheniusReactionRate,
                            gpuLindemannFallOffFunction>;
@@ -43,7 +45,8 @@ using ReactionRate = variant::variant<Arrhenius,
                                       ArrheniusSRIFallOff,
                                       ArrheniusLindemannChemicallyActivated,
                                       ArrheniusTroeChemicallyActivated,
-                                      ArrheniusSRIChemicallyActivated>;
+                                      ArrheniusSRIChemicallyActivated,
+                                      LandauTeller>;
 
 /*
 using ReactionRate =

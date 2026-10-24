@@ -23,6 +23,14 @@ static gpu::Arrhenius make_Arrhenius(const Foam::dictionary& dict) {
     return gpu::Arrhenius(A, beta, Ta);
 }
 
+static gpu::LandauTeller make_LandauTeller(const Foam::dictionary& dict) {
+    return gpu::LandauTeller(dict.lookup<gScalar>("A"),
+                             dict.lookup<gScalar>("beta"),
+                             lookup_Ta(dict),
+                             dict.lookup<gScalar>("B"),
+                             dict.lookup<gScalar>("C"));
+}
+
 static gpuThirdBodyEfficiencies
 make_thirdBodyEfficiencies(const Foam::speciesTable& species,
                            const Foam::dictionary&   dict) {
@@ -172,6 +180,12 @@ make_reaction_rate(const Foam::speciesTable& species,
     }
     if (reactionTypeName == "irreversibleArrhenius") {
         return gpuReactionRate(make_Arrhenius(dict), true);
+    }
+    if (reactionTypeName == "reversibleLandauTeller") {
+        return gpuReactionRate(make_LandauTeller(dict), false);
+    }
+    if (reactionTypeName == "irreversibleLandauTeller") {
+        return gpuReactionRate(make_LandauTeller(dict), true);
     }
     if (reactionTypeName == "reversibleThirdBodyArrhenius") {
         return gpuReactionRate(make_thirdBodyArrhenius(species, dict),

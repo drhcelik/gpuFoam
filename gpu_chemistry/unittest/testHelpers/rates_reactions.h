@@ -228,6 +228,28 @@ R"(reactions
             efficiencies    1((H2O 10));
         }
     }
+
+    reversibleLandauTeller
+    {
+        type            reversibleLandauTeller;
+        reaction        "OH + H2 = H + H2O";
+        A               2.14e+05;
+        beta            1.52;
+        Ta              1735.5;
+        B               -2.3;
+        C               15.7;
+    }
+
+    irreversibleLandauTeller
+    {
+        type            irreversibleLandauTeller;
+        reaction        "O + H2O = 2OH";
+        A               4.5e+04;
+        beta            2.0;
+        Ea              6.1e+07;
+        B               3.1;
+        C               -4.2;
+    }
 }
 Tlow            200;
 Thigh           5000;)"
