@@ -103,6 +103,28 @@ make_ArrheniusTroeFallOff(const Foam::speciesTable& species,
     return gpu::ArrheniusTroeFallOff(k0, kInf, F, tbes);
 }
 
+static gpuSRIFallOffFunction
+make_SRIFallOffFunction(const Foam::dictionary& dict) {
+    using namespace Foam;
+
+    return gpuSRIFallOffFunction(dict.lookup<scalar>("a"),
+                                 dict.lookup<scalar>("b"),
+                                 dict.lookup<scalar>("c"),
+                                 dict.lookup<scalar>("d"),
+                                 dict.lookup<scalar>("e"));
+}
+
+static gpu::ArrheniusSRIFallOff
+make_ArrheniusSRIFallOff(const Foam::speciesTable& species,
+                         const Foam::dictionary&   dict) {
+    auto k0   = make_Arrhenius(dict.subDict("k0"));
+    auto kInf = make_Arrhenius(dict.subDict("kInf"));
+    auto tbes = make_thirdBodyEfficiencies(
+        species, dict.subDict("thirdBodyEfficiencies"));
+    auto F = make_SRIFallOffFunction(dict.subDict("F"));
+    return gpu::ArrheniusSRIFallOff(k0, kInf, F, tbes);
+}
+
 static inline gpuReactionRate
 make_reaction_rate(const Foam::speciesTable& species,
                    const Foam::dictionary&   dict) {
@@ -149,6 +171,14 @@ make_reaction_rate(const Foam::speciesTable& species,
     if (reactionTypeName == "irreversibleArrheniusTroeFallOff") {
         return gpuReactionRate(
             make_ArrheniusTroeFallOff(species, dict), true);
+    }
+    if (reactionTypeName == "reversibleArrheniusSRIFallOff") {
+        return gpuReactionRate(
+            make_ArrheniusSRIFallOff(species, dict), false);
+    }
+    if (reactionTypeName == "irreversibleArrheniusSRIFallOff") {
+        return gpuReactionRate(
+            make_ArrheniusSRIFallOff(species, dict), true);
     }
 
     std::string msg = "Invalid reaction type: " + temp;

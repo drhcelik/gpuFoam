@@ -11,6 +11,7 @@
 #include "makeGpuReactionRate.H"
 #include "reaction.H"
 #include "thirdBodyEfficiencies.H"
+#include "SRIFallOffFunction.H"
 #include "IStringStream.H"
 #include "scalarMatrices.H"
 #include "ludecompose.H"
@@ -970,6 +971,40 @@ TEST_CASE("Test gpuThirdBodyEfficiencies (on CPU)", "[CPU]")
                 M += dMdc[i]*c[i];
             }
             CHECK(test.M(cs) == Approx(M).epsilon(errorTol));
+        }
+    }
+}
+
+
+TEST_CASE("Test gpuSRIFallOffFunction (on CPU)", "[CPU]")
+{
+    using namespace FoamGpu;
+
+    constexpr double errorTol = 1E-12;
+
+    const gScalar a = 0.45, b = 797, c = 979, d = 1.2, e = 0.3;
+    const gpuSRIFallOffFunction test(a, b, c, d, e);
+    const Foam::SRIFallOffFunction ref(a, b, c, d, e);
+
+    for (const gScalar T : {300.0, 1000.0, 2500.0})
+    {
+        for (const gScalar Pr : {0.0, 1e-3, 0.7, 1.0, 45.0})
+        {
+            DYNAMIC_SECTION("T = " << T << " Pr = " << Pr)
+            {
+                const gScalar F = ref.F(T, Pr);
+                CHECK(test(T, Pr) == Approx(F).epsilon(errorTol));
+                CHECK
+                (
+                    test.ddT(T, Pr, F)
+                 == Approx(ref.ddT(T, Pr, F)).epsilon(errorTol)
+                );
+                CHECK
+                (
+                    test.ddPr(T, Pr, F)
+                 == Approx(ref.ddPr(T, Pr, F)).epsilon(errorTol)
+                );
+            }
         }
     }
 }

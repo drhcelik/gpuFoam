@@ -6,6 +6,7 @@
 #include "gpuArrheniusReactionRate.H"
 #include "gpuFallOffReactionRate.H"
 #include "gpuLindemannFallOffFunction.H"
+#include "gpuSRIFallOffFunction.H"
 #include "gpuThirdBodyArrheniusReactionRate.H"
 #include "gpuTroeFallOffFunction.H"
 
@@ -21,11 +22,15 @@ using ArrheniusLindemannFallOff =
 using ArrheniusTroeFallOff =
     gpuFallOffReactionRate<gpuArrheniusReactionRate,
                            gpuTroeFallOffFunction>;
+using ArrheniusSRIFallOff =
+    gpuFallOffReactionRate<gpuArrheniusReactionRate,
+                           gpuSRIFallOffFunction>;
 
 using ReactionRate = variant::variant<Arrhenius,
                                       ThirdBodyArrhenius,
                                       ArrheniusLindemannFallOff,
-                                      ArrheniusTroeFallOff>;
+                                      ArrheniusTroeFallOff,
+                                      ArrheniusSRIFallOff>;
 
 /*
 using ReactionRate =
