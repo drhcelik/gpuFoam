@@ -1,15 +1,25 @@
 #pragma once
 
 #include "gpuReactionRate.H"
+#include "physicoChemicalConstants.H"
 #include "scalarField.H"
 #include "speciesTable.H"
 
 namespace FoamGpu {
 
+//- The activation temperature, Ta or Ea/RR, as OpenFOAM-dev
+//  ArrheniusReactionRate
+static gScalar lookup_Ta(const Foam::dictionary& dict) {
+    return dict.found("Ta") || !dict.found("Ea")
+             ? dict.lookup<gScalar>("Ta")
+             : dict.lookup<gScalar>("Ea") /
+                   Foam::constant::physicoChemical::RR.value();
+}
+
 static gpu::Arrhenius make_Arrhenius(const Foam::dictionary& dict) {
     gScalar A    = dict.lookup<gScalar>("A");
     gScalar beta = dict.lookup<gScalar>("beta");
-    gScalar Ta   = dict.lookup<gScalar>("Ta");
+    gScalar Ta   = lookup_Ta(dict);
     return gpu::Arrhenius(A, beta, Ta);
 }
 

@@ -4,6 +4,16 @@ R"(reactions
     // H2, GRI and YAO mechanisms, using the H2 mechanism species. The rate
     // coefficients are not physical.
 
+    // Activation energy Ea [J/kmol] instead of Ta
+    reversibleArrheniusEa
+    {
+        type            reversibleArrhenius;
+        reaction        "H2 + O = OH + H";
+        A               50.6;
+        beta            2.67;
+        Ea              2.6316e+07;
+    }
+
     irreversibleThirdBodyArrhenius
     {
         type            irreversibleThirdBodyArrhenius;
