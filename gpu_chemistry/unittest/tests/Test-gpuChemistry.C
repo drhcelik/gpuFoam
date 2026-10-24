@@ -789,6 +789,35 @@ TEST_CASE("Test isInteger (on CPU)", "[CPU]")
 }
 
 
+TEST_CASE("Test gpuThermo KpToKc (on CPU)", "[CPU]")
+{
+    // Same as species::thermo::Kc in OpenFOAM-dev: Kp for |nm| < small,
+    // integerPow for integer nm and pow otherwise
+    const std::vector<gScalar> xs{1e-3, 0.0123, 0.987654321, 1.5, 97.3};
+    const gScalar Kp = 3.21;
+
+    for (const gScalar x : xs)
+    {
+        for (int e = -6; e <= 6; ++e)
+        {
+            CHECK(FoamGpu::integerPow(x, e) == Foam::integerPow(x, e));
+            CHECK
+            (
+                FoamGpu::gpuThermo::KpToKc(Kp, gScalar(e), x)
+             == (e == 0 ? Kp : Kp*Foam::integerPow(x, e))
+            );
+        }
+
+        CHECK(FoamGpu::gpuThermo::KpToKc(Kp, 1e-17, x) == Kp);
+        CHECK
+        (
+            FoamGpu::gpuThermo::KpToKc(Kp, 0.5, x)
+         == Kp*Foam::pow(x, Foam::scalar(0.5))
+        );
+    }
+}
+
+
 TEST_CASE("Test gpuThirdBodyEfficiencies (on CPU)", "[CPU]")
 {
     using namespace FoamGpu;
