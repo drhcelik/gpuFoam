@@ -4,6 +4,7 @@
 #include "variant.hpp"
 
 #include "gpuArrheniusReactionRate.H"
+#include "gpuChemicallyActivatedReactionRate.H"
 #include "gpuFallOffReactionRate.H"
 #include "gpuLindemannFallOffFunction.H"
 #include "gpuSRIFallOffFunction.H"
@@ -25,12 +26,24 @@ using ArrheniusTroeFallOff =
 using ArrheniusSRIFallOff =
     gpuFallOffReactionRate<gpuArrheniusReactionRate,
                            gpuSRIFallOffFunction>;
+using ArrheniusLindemannChemicallyActivated =
+    gpuChemicallyActivatedReactionRate<gpuArrheniusReactionRate,
+                                       gpuLindemannFallOffFunction>;
+using ArrheniusTroeChemicallyActivated =
+    gpuChemicallyActivatedReactionRate<gpuArrheniusReactionRate,
+                                       gpuTroeFallOffFunction>;
+using ArrheniusSRIChemicallyActivated =
+    gpuChemicallyActivatedReactionRate<gpuArrheniusReactionRate,
+                                       gpuSRIFallOffFunction>;
 
 using ReactionRate = variant::variant<Arrhenius,
                                       ThirdBodyArrhenius,
                                       ArrheniusLindemannFallOff,
                                       ArrheniusTroeFallOff,
-                                      ArrheniusSRIFallOff>;
+                                      ArrheniusSRIFallOff,
+                                      ArrheniusLindemannChemicallyActivated,
+                                      ArrheniusTroeChemicallyActivated,
+                                      ArrheniusSRIChemicallyActivated>;
 
 /*
 using ReactionRate =

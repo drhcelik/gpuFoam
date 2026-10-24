@@ -84,22 +84,24 @@ make_ArrheniusLindemannFallOff(const Foam::speciesTable& species,
     return gpu::ArrheniusLindemannFallOff(k0, kInf, F, tbes);
 }
 
+static gpuTroeFallOffFunction
+make_TroeFallOffFunction(const Foam::dictionary& dict) {
+    using namespace Foam;
+
+    return gpuTroeFallOffFunction(dict.lookup<scalar>("alpha"),
+                                  dict.lookup<scalar>("Tsss"),
+                                  dict.lookup<scalar>("Ts"),
+                                  dict.lookup<scalar>("Tss"));
+}
+
 static gpu::ArrheniusTroeFallOff
 make_ArrheniusTroeFallOff(const Foam::speciesTable& species,
                           const Foam::dictionary&   dict) {
-    using namespace Foam;
-
     auto k0   = make_Arrhenius(dict.subDict("k0"));
     auto kInf = make_Arrhenius(dict.subDict("kInf"));
-
     auto tbes = make_thirdBodyEfficiencies(
         species, dict.subDict("thirdBodyEfficiencies"));
-    auto                   subDict = dict.subDict("F");
-    scalar                 alpha   = subDict.lookup<scalar>("alpha");
-    scalar                 Tsss    = subDict.lookup<scalar>("Tsss");
-    scalar                 Ts      = subDict.lookup<scalar>("Ts");
-    scalar                 Tss     = subDict.lookup<scalar>("Tss");
-    gpuTroeFallOffFunction F(alpha, Tsss, Ts, Tss);
+    auto F = make_TroeFallOffFunction(dict.subDict("F"));
     return gpu::ArrheniusTroeFallOff(k0, kInf, F, tbes);
 }
 
@@ -123,6 +125,19 @@ make_ArrheniusSRIFallOff(const Foam::speciesTable& species,
         species, dict.subDict("thirdBodyEfficiencies"));
     auto F = make_SRIFallOffFunction(dict.subDict("F"));
     return gpu::ArrheniusSRIFallOff(k0, kInf, F, tbes);
+}
+
+//- Construct a k0, kInf, F and thirdBodyEfficiencies rate, i.e. a fall-off
+//  or a chemically activated rate, with the given F
+template <class Rate, class F>
+static Rate make_k0kInfFRate(const Foam::speciesTable& species,
+                             const Foam::dictionary&   dict,
+                             const F&                  f) {
+    auto k0   = make_Arrhenius(dict.subDict("k0"));
+    auto kInf = make_Arrhenius(dict.subDict("kInf"));
+    auto tbes = make_thirdBodyEfficiencies(
+        species, dict.subDict("thirdBodyEfficiencies"));
+    return Rate(k0, kInf, f, tbes);
 }
 
 static inline gpuReactionRate
@@ -179,6 +194,43 @@ make_reaction_rate(const Foam::speciesTable& species,
     if (reactionTypeName == "irreversibleArrheniusSRIFallOff") {
         return gpuReactionRate(
             make_ArrheniusSRIFallOff(species, dict), true);
+    }
+
+    if (reactionTypeName == "reversibleArrheniusLindemannChemicallyActivated") {
+        return gpuReactionRate(
+            make_k0kInfFRate<ArrheniusLindemannChemicallyActivated>(
+                species, dict, gpuLindemannFallOffFunction()),
+            false);
+    }
+    if (reactionTypeName == "irreversibleArrheniusLindemannChemicallyActivated") {
+        return gpuReactionRate(
+            make_k0kInfFRate<ArrheniusLindemannChemicallyActivated>(
+                species, dict, gpuLindemannFallOffFunction()),
+            true);
+    }
+    if (reactionTypeName == "reversibleArrheniusTroeChemicallyActivated") {
+        return gpuReactionRate(
+            make_k0kInfFRate<ArrheniusTroeChemicallyActivated>(
+                species, dict, make_TroeFallOffFunction(dict.subDict("F"))),
+            false);
+    }
+    if (reactionTypeName == "irreversibleArrheniusTroeChemicallyActivated") {
+        return gpuReactionRate(
+            make_k0kInfFRate<ArrheniusTroeChemicallyActivated>(
+                species, dict, make_TroeFallOffFunction(dict.subDict("F"))),
+            true);
+    }
+    if (reactionTypeName == "reversibleArrheniusSRIChemicallyActivated") {
+        return gpuReactionRate(
+            make_k0kInfFRate<ArrheniusSRIChemicallyActivated>(
+                species, dict, make_SRIFallOffFunction(dict.subDict("F"))),
+            false);
+    }
+    if (reactionTypeName == "irreversibleArrheniusSRIChemicallyActivated") {
+        return gpuReactionRate(
+            make_k0kInfFRate<ArrheniusSRIChemicallyActivated>(
+                species, dict, make_SRIFallOffFunction(dict.subDict("F"))),
+            true);
     }
 
     std::string msg = "Invalid reaction type: " + temp;

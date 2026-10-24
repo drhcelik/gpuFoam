@@ -131,6 +131,93 @@ R"(reactions
             defaultEfficiency 1;
         }
     }
+
+    reversibleArrheniusLindemannChemicallyActivated
+    {
+        type            reversibleArrheniusLindemannChemicallyActivated;
+        reaction        "H + HO2 = H2O2";
+        k0
+        {
+            A               2.0e+14;
+            beta            -1.1;
+            Ta              150;
+        }
+        kInf
+        {
+            A               3.0e+10;
+            beta            0.3;
+            Ta              50;
+        }
+        F
+        {
+        }
+        thirdBodyEfficiencies
+        {
+            defaultEfficiency 1;
+            efficiencies    2((H2 2)(H2O 6));
+        }
+    }
+
+    irreversibleArrheniusTroeChemicallyActivated
+    {
+        type            irreversibleArrheniusTroeChemicallyActivated;
+        reaction        "OH + OH = H2O + O";
+        k0
+        {
+            A               3.5e+13;
+            beta            -0.8;
+            Ta              -200;
+        }
+        kInf
+        {
+            A               5.0e+09;
+            beta            0.1;
+            Ta              400;
+        }
+        F
+        {
+            alpha           0.6;
+            Tsss            100;
+            Ts              1500;
+            Tss             4000;
+        }
+        thirdBodyEfficiencies
+        {
+            defaultEfficiency 1.2;
+            efficiency      (N2 0.7);
+        }
+    }
+
+    reversibleArrheniusSRIChemicallyActivated
+    {
+        type            reversibleArrheniusSRIChemicallyActivated;
+        reaction        "O + H2O = 2OH";
+        k0
+        {
+            A               8.0e+12;
+            beta            -0.5;
+            Ta              8000;
+        }
+        kInf
+        {
+            A               2.0e+08;
+            beta            1.1;
+            Ta              7500;
+        }
+        F
+        {
+            a               0.5;
+            b               500;
+            c               1200;
+            d               1.1;
+            e               0.2;
+        }
+        thirdBodyEfficiencies
+        {
+            defaultEfficiency 1;
+            efficiencies    1((H2O 10));
+        }
+    }
 }
 Tlow            200;
 Thigh           5000;)"
