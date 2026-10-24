@@ -35,7 +35,7 @@ GpuKernelEvaluator::GpuKernelEvaluator(
 
 std::pair<std::vector<gScalar>, std::vector<gScalar>>
 GpuKernelEvaluator::computeYNew(
-    gScalar                     deltaT,
+    const std::vector<gScalar>& deltaT,
     gScalar                     deltaTChemMax,
     const std::vector<gScalar>& deltaTChem,
     const std::vector<gScalar>& p,
@@ -46,6 +46,7 @@ GpuKernelEvaluator::computeYNew(
     memory_.resize(nCells, nSpecie_);
 
     // Convert fields from host to device
+    auto ddeltaT_arr     = toDeviceVector(deltaT);
     auto ddeltaTChem_arr = toDeviceVector(deltaTChem);
     auto dYvf_arr        = toDeviceVector(Y);
     auto dp_arr          = toDeviceVector(p);
@@ -54,12 +55,14 @@ GpuKernelEvaluator::computeYNew(
     auto dYvf = make_mdspan(dYvf_arr, extents<2>{nCells, nEqns_});
     auto dp   = mdspan<const gScalar, 1>(
         make_raw_pointer(dp_arr.data()), extents<1>{nCells});
+    auto ddeltaT = mdspan<const gScalar, 1>(
+        make_raw_pointer(ddeltaT_arr.data()), extents<1>{nCells});
 
     auto buffers     = toDeviceVector(splitToBuffers(memory_));
     auto buffer_span = make_mdspan(buffers, extents<1>{nCells});
 
     singleCellSolver op(
-        deltaT, nSpecie_, ddeltaTChem, dYvf, dp, buffer_span, solver_, Treact_);
+        ddeltaT, nSpecie_, ddeltaTChem, dYvf, dp, buffer_span, solver_, Treact_);
 
     for_each_index(op, nCells);
 
@@ -68,7 +71,7 @@ GpuKernelEvaluator::computeYNew(
 }
 
 std::tuple<std::vector<gScalar>, std::vector<gScalar>, gScalar>
-GpuKernelEvaluator::computeRR(gScalar deltaT,
+GpuKernelEvaluator::computeRR(const std::vector<gScalar>& deltaT,
                               gScalar deltaTChemMax,
                               const std::vector<gScalar>& rho,
                               const std::vector<gScalar>& deltaTChem,
@@ -90,7 +93,7 @@ GpuKernelEvaluator::computeRR(gScalar deltaT,
     for (gLabel j = 0; j < nCells; ++j) {
         for (gLabel i = 0; i < nSpecie_; ++i) {
 
-            RR(j, i) = rho[j] * (YNew(j, i) - Y0(j, i)) / deltaT;
+            RR(j, i) = rho[j] * (YNew(j, i) - Y0(j, i)) / deltaT[j];
         }
     }
 

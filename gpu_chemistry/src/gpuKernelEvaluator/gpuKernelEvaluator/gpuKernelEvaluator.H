@@ -45,7 +45,8 @@ public:
     /// @brief Given an input solution ode vectors Y and time steps,
     /// compute the new solution vectors and time step field by
     /// calling the an ode.
-    /// @param deltaT Current flow time step.
+    /// @param deltaT Current cell-specific flow time steps (local
+    /// time stepping) or a single flow time step for all cells.
     /// @param deltaTChemMax Maximum chemistry time step..
     /// @param deltaTChem Current cell-specific chemistry time steps.
     /// @param p The cell-specific pressures, constant during the
@@ -53,15 +54,29 @@ public:
     /// @param Y The current cell-specific solution vectors [Y, T].
     /// @return New solution vectors and chemistry time steps.
     std::pair<std::vector<gScalar>, std::vector<gScalar>>
-    computeYNew(gScalar                     deltaT,
+    computeYNew(const std::vector<gScalar>& deltaT,
                 gScalar                     deltaTChemMax,
                 const std::vector<gScalar>& deltaTChem,
                 const std::vector<gScalar>& p,
                 const std::vector<gScalar>& Y);
 
+    std::pair<std::vector<gScalar>, std::vector<gScalar>>
+    computeYNew(gScalar                     deltaT,
+                gScalar                     deltaTChemMax,
+                const std::vector<gScalar>& deltaTChem,
+                const std::vector<gScalar>& p,
+                const std::vector<gScalar>& Y) {
+        return computeYNew(std::vector<gScalar>(deltaTChem.size(), deltaT),
+                           deltaTChemMax,
+                           deltaTChem,
+                           p,
+                           Y);
+    }
+
     /// @brief Computes the reaction rate based on the input flow
     /// properties.
-    /// @param deltaT Current flow time step.
+    /// @param deltaT Current cell-specific flow time steps (local
+    /// time stepping) or a single flow time step for all cells.
     /// @param deltaTChemMax Maximum chemistry time step.
     /// @param rho The density field.
     /// @param deltaTChem Current cell-specific chemistry time steps.
@@ -72,12 +87,27 @@ public:
     /// new chemistry time steps and the minimum new chemistry time
     /// step.
     std::tuple<std::vector<gScalar>, std::vector<gScalar>, gScalar>
-    computeRR(gScalar                    deltaT,
-              gScalar                    deltaTChemMax,
+    computeRR(const std::vector<gScalar>& deltaT,
+              gScalar                     deltaTChemMax,
               const std::vector<gScalar>& rho,
               const std::vector<gScalar>& deltaTChem,
               const std::vector<gScalar>& p,
               const std::vector<gScalar>& Yvf);
+
+    std::tuple<std::vector<gScalar>, std::vector<gScalar>, gScalar>
+    computeRR(gScalar                     deltaT,
+              gScalar                     deltaTChemMax,
+              const std::vector<gScalar>& rho,
+              const std::vector<gScalar>& deltaTChem,
+              const std::vector<gScalar>& p,
+              const std::vector<gScalar>& Yvf) {
+        return computeRR(std::vector<gScalar>(rho.size(), deltaT),
+                         deltaTChemMax,
+                         rho,
+                         deltaTChem,
+                         p,
+                         Yvf);
+    }
 
 private:
     gLabel              nEqns_, nSpecie_, nReactions_;

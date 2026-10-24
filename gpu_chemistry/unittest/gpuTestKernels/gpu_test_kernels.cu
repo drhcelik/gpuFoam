@@ -722,9 +722,11 @@ bool test_single_cell_solver(TestData::Mechanism mech, gLabel nCells){
         std::vector<gScalar>(nCells, TestData::pInf(mech))
     );
     const auto p_span = make_mdspan(p_d, extents<1>{nCells});
+    const auto deltaT_d = toDeviceVector(std::vector<gScalar>(nCells, deltaT));
+    const auto deltaT_span = make_mdspan(deltaT_d, extents<1>{nCells});
 
     singleCellSolver op(
-        deltaT,
+        deltaT_span,
         nSpecie,
         deltaTChem_span,
         Y_span,

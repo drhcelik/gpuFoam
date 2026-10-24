@@ -9,7 +9,7 @@ namespace FoamGpu {
 
 struct singleCellSolver {
 
-    singleCellSolver(gScalar              deltaT,
+    singleCellSolver(mdspan<const gScalar, 1> deltaT,
                      gLabel               nSpecie,
                      mdspan<gScalar, 1>   deltaTChem,
                      mdspan<gScalar, 2>   Yvf,
@@ -35,7 +35,7 @@ struct singleCellSolver {
             buffer_[celli].p() = p_[celli];
 
             // Initialise time progress
-            gScalar timeLeft = deltaT_;
+            gScalar timeLeft = deltaT_[celli];
 
             // Calculate the chemical source terms
             while (timeLeft > gpuSmall) {
@@ -51,11 +51,11 @@ struct singleCellSolver {
             }
         }
         else {
-            deltaTChem_[celli] = deltaT_; // set the chemistry time step to the flow time step
+            deltaTChem_[celli] = deltaT_[celli]; // set the chemistry time step to the flow time step
         }
     }
 
-    gScalar              deltaT_;
+    mdspan<const gScalar, 1> deltaT_;
     gLabel               nSpecie_;
     mdspan<gScalar, 1>   deltaTChem_;
     mdspan<gScalar, 2>   Yvf_;

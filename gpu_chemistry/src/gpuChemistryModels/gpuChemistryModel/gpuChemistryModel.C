@@ -342,20 +342,20 @@ template<class cpuThermoType>
 scalar gpuChemistryModel<cpuThermoType>::solve(const scalar deltaT) {
     // Don't allow the time-step to change more than a factor of 2
     return min(
-        // this->doSolve<UniformField<scalar>>(UniformField<scalar>(deltaT)),
-        this->computeRRAndChemDeltaT(deltaT),
+        this->computeRRAndChemDeltaT(UniformField<scalar>(deltaT)),
         2 * deltaT);
 }
 
 template<class cpuThermoType>
 scalar gpuChemistryModel<cpuThermoType>::solve(const scalarField& deltaT) {
-    throw std::logic_error("LTS time step not yet supported");
-    // return this->doSolve<scalarField>(deltaT);
-    return 0;
+    // Local time stepping, as OpenFOAM-dev chemistryModels::Standard
+    return this->computeRRAndChemDeltaT(deltaT);
 }
 
 template<class cpuThermoType>
-scalar gpuChemistryModel<cpuThermoType>::computeRRAndChemDeltaT(const scalar& deltaT) {
+template<class DeltaTType>
+scalar gpuChemistryModel<cpuThermoType>::computeRRAndChemDeltaT(
+    const DeltaTType& deltaT) {
 
     if (!this->chemistry_) { return great; }
 
@@ -371,12 +371,18 @@ scalar gpuChemistryModel<cpuThermoType>::computeRRAndChemDeltaT(const scalar& de
 
     if (nZoneCells == 0) { return great; }
 
-    /*
-    auto [RR, deltaTChem, minDeltaT] = evaluator_.computeRR(
-        deltaT, deltaTChemMax_, getRho0(), getDeltaTChem(), getP0(), getY0());
-    */
-    auto tpl = evaluator_.computeRR(
-        deltaT, deltaTChemMax_, getRho0(), getDeltaTChem(), getP0(), getY0());
+    // The flow time step of the zone cells
+    std::vector<gScalar> zoneDeltaT(nZoneCells);
+    for (label zci = 0; zci < nZoneCells; zci++) {
+        zoneDeltaT[zci] = deltaT[zone_.celli(zci)];
+    }
+
+    auto tpl = evaluator_.computeRR(zoneDeltaT,
+                                    deltaTChemMax_,
+                                    getRho0(),
+                                    getDeltaTChem(),
+                                    getP0(),
+                                    getY0());
 
     auto RR = std::get<0>(tpl);
     auto deltaTChem = std::get<1>(tpl);

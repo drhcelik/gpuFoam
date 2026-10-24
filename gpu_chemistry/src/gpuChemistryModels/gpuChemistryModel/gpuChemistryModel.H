@@ -10,6 +10,7 @@
 #include "readGpuOdeInputs.H"
 
 #include "DynamicField.H"
+#include "UniformField.H"
 #include "ODESystem.H"
 #include "ReactionList.H"
 
@@ -99,10 +100,12 @@ private:
                   const multicomponentMixture<cpuThermoType>& mixture);
 
     /// @brief Computes and updates the reaction rates (RR_) as well as
-    /// chemistry time steps (chemDeltaT_).
-    /// @param deltaT The current flow time step.
+    /// chemistry time steps (deltaTChem_) of the zone cells.
+    /// @param deltaT The current flow time step: a UniformField for a
+    /// global time step or a scalarField for local time stepping.
     /// @return The minimum of the computed chemistry time steps.
-    scalar computeRRAndChemDeltaT(const scalar& deltaT);
+    template<class DeltaTType>
+    scalar computeRRAndChemDeltaT(const DeltaTType& deltaT);
 
 public:
     //- Runtime type information
