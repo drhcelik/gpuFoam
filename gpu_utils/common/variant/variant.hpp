@@ -478,7 +478,7 @@ struct getter {
     template<typename X>
     CUDA_HOSTDEV
     T operator()(X) const {
-#ifdef __CUDA_ARCH__
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
         bool bad_get = false;
         assert(bad_get);
         return *static_cast<T*>(nullptr);
