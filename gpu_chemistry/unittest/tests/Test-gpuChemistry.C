@@ -449,6 +449,13 @@ TEST_CASE("Test gpuReaction (on CPU)", "[CPU]")
         auto reference = OFReferenceKernels::reaction(TestData::H2);
         reactionTests(test_result, reference, errorTol);
     }
+
+    SECTION("RATES")
+    {
+        auto test_result = CpuTestKernels::reaction(TestData::RATES);
+        auto reference = OFReferenceKernels::reaction(TestData::RATES);
+        reactionTests(test_result, reference, errorTol);
+    }
 }
 
 
@@ -478,6 +485,13 @@ TEST_CASE("Test gpuReaction (on GPU)", "[GPU]")
 
         auto test_result = GpuTestKernels::reaction(TestData::H2);
         auto reference = OFReferenceKernels::reaction(TestData::H2);
+        reactionTests(test_result, reference, errorTol);
+    }
+
+    SECTION("RATES")
+    {
+        auto test_result = GpuTestKernels::reaction(TestData::RATES);
+        auto reference = OFReferenceKernels::reaction(TestData::RATES);
         reactionTests(test_result, reference, errorTol);
     }
 
@@ -680,6 +694,23 @@ TEST_CASE("Test gpuOdeSystem (on CPU)", "[CPU]")
             Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
         );
     }
+    SECTION("RATES"){
+
+        auto test_result = CpuTestKernels::odesystem(TestData::Mechanism::RATES);
+        auto reference = OFReferenceKernels::odesystem(TestData::Mechanism::RATES);
+
+        CHECK_THAT
+        (
+            test_result.derivative,
+            Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
+        );
+
+        CHECK_THAT
+        (
+            test_result.jacobian,
+            Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
+        );
+    }
 }
 
 
@@ -748,6 +779,23 @@ TEST_CASE("Test gpuOdeSystem (on GPU)", "[GPU]")
         );
 
 
+    }
+    SECTION("RATES"){
+
+        auto test_result = GpuTestKernels::odesystem(TestData::Mechanism::RATES);
+        auto reference = OFReferenceKernels::odesystem(TestData::Mechanism::RATES);
+
+        CHECK_THAT
+        (
+            test_result.derivative,
+            Catch::Matchers::Approx(reference.derivative).epsilon(errorTol)
+        );
+
+        CHECK_THAT
+        (
+            test_result.jacobian,
+            Catch::Matchers::Approx(reference.jacobian).epsilon(errorTol)
+        );
     }
 }
 
@@ -922,6 +970,39 @@ TEST_CASE("Test gpuThirdBodyEfficiencies (on CPU)", "[CPU]")
                 M += dMdc[i]*c[i];
             }
             CHECK(test.M(cs) == Approx(M).epsilon(errorTol));
+        }
+    }
+}
+
+
+TEST_CASE("Test make_reaction_rate unsupported types (on CPU)", "[CPU]")
+{
+    using namespace FoamGpu;
+
+    // The reaction types without a device implementation are rejected
+    const Foam::wordList names({"H2", "O2", "H2O", "N2"});
+    const Foam::speciesTable species(names);
+
+    const std::vector<std::string> dicts =
+    {
+        "type nonEquilibriumReversibleArrhenius; "
+        "forward {A 1; beta 0; Ta 0;} reverse {A 1; beta 0; Ta 0;}",
+        "type reversiblePowerSeries; A 1; beta 0; theta 0; b 4(0 0 0 0);",
+        "type irreversibleMichaelisMenten; Km 1; S H2; Vmax 1;",
+        "type reversibleLangmuirHinshelwood; reactants 2(H2 O2);",
+        "type irreversibleSurfaceArrhenius; A 1; beta 0; Ta 0;"
+    };
+
+    for (const auto& d : dicts)
+    {
+        DYNAMIC_SECTION(d)
+        {
+            const Foam::dictionary dict((Foam::IStringStream(d))());
+            REQUIRE_THROWS_AS
+            (
+                make_reaction_rate(species, dict),
+                std::logic_error
+            );
         }
     }
 }

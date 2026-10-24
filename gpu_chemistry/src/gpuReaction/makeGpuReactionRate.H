@@ -130,13 +130,25 @@ make_reaction_rate(const Foam::speciesTable& species,
         return gpuReactionRate(make_thirdBodyArrhenius(species, dict),
                                false);
     }
+    if (reactionTypeName == "irreversibleThirdBodyArrhenius") {
+        return gpuReactionRate(make_thirdBodyArrhenius(species, dict),
+                               true);
+    }
     if (reactionTypeName == "reversibleArrheniusLindemannFallOff") {
         return gpuReactionRate(
             make_ArrheniusLindemannFallOff(species, dict), false);
     }
+    if (reactionTypeName == "irreversibleArrheniusLindemannFallOff") {
+        return gpuReactionRate(
+            make_ArrheniusLindemannFallOff(species, dict), true);
+    }
     if (reactionTypeName == "reversibleArrheniusTroeFallOff") {
         return gpuReactionRate(
             make_ArrheniusTroeFallOff(species, dict), false);
+    }
+    if (reactionTypeName == "irreversibleArrheniusTroeFallOff") {
+        return gpuReactionRate(
+            make_ArrheniusTroeFallOff(species, dict), true);
     }
 
     std::string msg = "Invalid reaction type: " + temp;

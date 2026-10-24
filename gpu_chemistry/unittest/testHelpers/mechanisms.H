@@ -6,7 +6,9 @@
 
 namespace TestData {
 
-enum Mechanism { GRI, H2, YAO, CH4_1STEP };
+// RATES: the reaction rate types not used by the other mechanisms, with the
+// H2 mechanism species and thermos (rates_reactions.h)
+enum Mechanism { GRI, H2, YAO, CH4_1STEP, RATES };
 
 static inline gLabel speciesCount(Mechanism m) {
 
@@ -15,6 +17,7 @@ static inline gLabel speciesCount(Mechanism m) {
     case Mechanism::YAO: return 54;
     case Mechanism::H2: return 10;
     case Mechanism::CH4_1STEP: return 5;
+    case Mechanism::RATES: return 10;
     default: throw std::logic_error("Invalid mechanism");
     }
 }
@@ -32,6 +35,7 @@ static inline gScalar pInf(Mechanism m) {
     case Mechanism::YAO: return 1.36789e+06;
     case Mechanism::H2: return 202650.0;
     case Mechanism::CH4_1STEP: return 101325.0;
+    case Mechanism::RATES: return 202650.0;
     default: throw std::logic_error("Invalid mechanism");
     }
 }
@@ -135,6 +139,7 @@ static inline void assign_test_condition(T& f, Mechanism m) {
     case Mechanism::YAO: assign_yao(f); return;
     case Mechanism::H2: assign_h2(f); return;
     case Mechanism::CH4_1STEP: assign_ch4_1step(f); return;
+    case Mechanism::RATES: assign_h2(f); return; // H2 species
     default: throw std::logic_error("Invalid mechanism");
     }
 }
