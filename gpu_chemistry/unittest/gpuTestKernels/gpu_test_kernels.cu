@@ -11,6 +11,9 @@
 #include "create_gpu_inputs.H"
 #include "makeGpuOdeSolver.H"
 #include "host_device_vectors.H"
+#include "host_device_transfers.H"
+
+#include <iostream>
 
 
 namespace GpuTestKernels{

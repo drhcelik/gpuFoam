@@ -1,0 +1,118 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Builds and runs the gpuFoam unit tests on the CPU, without a GPU compiler.
+#
+# The device sources (.cu) are compiled as C++ with the host compiler and the
+# headers in ./include, which replace the gpu_utils runtime headers by serial
+# host versions: kernels run serially and "device" memory is host memory.
+# Both the [CPU] tests and the [GPU] kernel tests are then run, the latter
+# checking the device code paths against the OpenFOAM reference kernels.
+#
+# This tests the device code on the host only. It does not replace a build
+# and a test run with nvcc or hipcc on a GPU.
+#
+# Usage: ./Allrun [-j N] [-build <dir>] [-norun] [-- <Catch2 arguments>]
+#
+# Requires a sourced OpenFOAM-dev environment.
+#------------------------------------------------------------------------------
+set -e
+cd "${0%/*}" || exit 1
+
+E=$PWD
+SCRIPT=$E/${0##*/}
+G=$(cd ../../.. && pwd)
+BUILD=$E/build
+NPROCS=$(nproc 2>/dev/null || echo 1)
+RUN=1
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -j) NPROCS=$2; shift 2 ;;
+        -build) BUILD=$(mkdir -p "$2" && cd "$2" && pwd); shift 2 ;;
+        -norun) RUN=; shift ;;
+        --) shift; break ;;
+        -h|-help) sed -n '3,16p' "$SCRIPT"; exit 0 ;;
+        *) echo "Unknown option $1" >&2; exit 1 ;;
+    esac
+done
+
+if [ -z "$WM_PROJECT_DIR" ]; then
+    echo "Source the OpenFOAM-dev etc/bashrc first" >&2
+    exit 1
+fi
+
+S=$WM_PROJECT_DIR/src
+L=$FOAM_LIBBIN
+
+# The host emulation headers first, then the gpuFoam source directories
+INC="-I$E/include"
+for d in \
+    $G/gpu_utils/common \
+    $G/gpu_utils/common/mdspan \
+    $G/gpu_utils/common/variant \
+    $(find $G/gpu_chemistry/src $G/gpu_chemistry/unittest \
+        $G/gpu_chemistry/catchMain -type d \
+        ! -name lnInclude ! -name Make ! -path "$E*" | sort)
+do
+    INC="$INC -I$d"
+done
+for d in \
+    physicalProperties \
+    thermophysicalModels/multicomponentThermo \
+    thermophysicalModels/basic \
+    thermophysicalModels/specie \
+    thermophysicalModels/chemistryModel \
+    ODE \
+    finiteVolume \
+    meshTools \
+    OpenFOAM \
+    OSspecific/POSIX
+do
+    INC="$INC -I$S/$d/lnInclude"
+done
+INC="$INC -I$S/thermophysicalModels/functions/Polynomial"
+
+CXX="${WM_CXX:-g++}"
+CXXFLAGS="-std=c++17 -m64 -Dlinux64 -DWM_ARCH_OPTION=${WM_ARCH_OPTION:-64} \
+-DWM_${WM_PRECISION_OPTION:-DP} -DWM_LABEL_SIZE=${WM_LABEL_SIZE:-32} \
+-DNoRepository -ftemplate-depth-256 -O1 -fPIC -w"
+
+SOURCES="\
+$G/gpu_chemistry/src/gpuKernelEvaluator/gpuKernelEvaluator/gpuKernelEvaluator.cu
+$G/gpu_chemistry/src/gpuKernelEvaluator/gpuKernelEvaluator/thermosAndReactions.cu
+$G/gpu_chemistry/src/gpuKernelEvaluator/gpuKernelEvaluator/gpuMemoryResource.cu
+$G/gpu_chemistry/src/gpuKernelEvaluator/gpuKernelEvaluator/singleCellSolver.cu
+$G/gpu_chemistry/catchMain/main.C
+$G/gpu_chemistry/unittest/testHelpers/create_foam_inputs.C
+$G/gpu_chemistry/unittest/testHelpers/create_gpu_inputs.C
+$G/gpu_chemistry/unittest/OpenFOAMReferenceKernels/openfoam_reference_kernels.C
+$G/gpu_chemistry/unittest/cpuTestKernels/cpu_test_kernels.C
+$G/gpu_chemistry/unittest/gpuTestKernels/gpu_test_kernels.cu
+$G/gpu_chemistry/unittest/tests/Test-gpuChemistry.C"
+
+mkdir -p "$BUILD"
+echo "Compiling into $BUILD"
+
+export CXX CXXFLAGS INC BUILD
+printf '%s\n' $SOURCES | xargs -P "$NPROCS" -I{} sh -c '
+    f={}; o=$BUILD/$(basename "${f%.*}").o
+    echo "    $(basename "$f")"
+    $CXX $CXXFLAGS -x c++ $INC -c "$f" -o "$o"
+'
+
+EXE=$BUILD/Test-gpuChemistry-hostEmulation
+
+$CXX -o "$EXE" "$BUILD"/*.o \
+    -L"$L" -Wl,-rpath,"$L" -Wl,--no-as-needed \
+    -lchemistryModel -lmulticomponentThermophysicalModels \
+    -lfluidThermophysicalModels -lthermophysicalProperties \
+    -lphysicalProperties -lspecie -lODE -lfiniteVolume -lmeshTools \
+    -lOpenFOAM -L"$L/$FOAM_MPI" -Wl,-rpath,"$L/$FOAM_MPI" -lPstream -ldl -lm
+
+echo "Built $EXE"
+
+if [ -n "$RUN" ]; then
+    "$EXE" "$@"
+fi
+
+#------------------------------------------------------------------------------

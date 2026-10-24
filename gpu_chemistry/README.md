@@ -57,4 +57,20 @@ The following list of reactions are supported:
 * reversibleArrheniusTroeFallOff
 
 
+## Unit tests
+The unit tests compare the gpuFoam models against the OpenFOAM reference implementations. They are compiled by ```Allwmake``` into ```Test-gpuChemistry``` which runs the tests on the CPU ```[CPU]``` and on the GPU ```[GPU]```:
+```
+Test-gpuChemistry          # all tests
+Test-gpuChemistry "[CPU]"  # CPU tests only
+```
 
+#### Running the GPU kernel tests on the CPU
+The script ```unittest/hostEmulation/Allrun``` builds and runs the unit tests, including the ```[GPU]``` kernel tests, on the CPU without a GPU or a GPU compiler. The device sources (```.cu```) are compiled as C++ with the host compiler, using the headers in ```unittest/hostEmulation/include``` in place of the GPU runtime headers of ```gpu_utils/common```: the kernels are run serially and the device memory is host memory.
+```
+cd unittest/hostEmulation
+./Allrun                    # build into ./build and run all tests
+./Allrun -norun             # build only
+./Allrun -- "[GPU]"         # run the GPU kernel tests only
+./Allclean
+```
+This requires a sourced OpenFOAM-dev environment and a C++17 host compiler. It checks the device code paths against the OpenFOAM reference kernels on the host, but it does not replace compiling with nvcc or hipcc and running the tests on a GPU.
