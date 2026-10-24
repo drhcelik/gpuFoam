@@ -317,7 +317,6 @@ TestData::odeSystemResults odesystem(TestData::Mechanism mech)
     std::vector<gScalar> t(nEqns);
     fill_linear(t);
     t[nSpecie] = TestData::TInf(mech);
-    t[nSpecie + 1] = TestData::pInf(mech);
     return odesystem(mech, t);
 }
 
@@ -345,6 +344,7 @@ TestData::odeSystemResults odesystem
 
 
     const device_vector<gScalar> y0_v = toDeviceVector(y0);
+    const gScalar p = TestData::pInf(mech);
 
 
 
@@ -352,7 +352,7 @@ TestData::odeSystemResults odesystem
 
     {
         memoryResource_t memory(1, nSpecie);
-        auto buffers = toDeviceVector(splitToBuffers(memory));
+        auto buffers = toDeviceVector(splitToBuffers(memory, p));
 
         device_vector<gScalar> dy_v(nEqns);
         auto f =
@@ -375,7 +375,7 @@ TestData::odeSystemResults odesystem
     {
 
         memoryResource_t memory(1, nSpecie);
-        auto buffers = toDeviceVector(splitToBuffers(memory));
+        auto buffers = toDeviceVector(splitToBuffers(memory, p));
         device_vector<gScalar> dy_v(nEqns);
         device_vector<gScalar> J_v(nEqns*nEqns);
 
@@ -436,7 +436,6 @@ std::vector<gScalar> ode_solve(TestData::Mechanism mech, std::string solver_name
         std::vector<gScalar> t(nEqns);
         fill_linear(t);
         t[nSpecie] = TestData::TInf(mech);
-        t[nSpecie + 1] = TestData::pInf(mech);
         return toDeviceVector(t);
     }();
     */
@@ -445,7 +444,8 @@ std::vector<gScalar> ode_solve(TestData::Mechanism mech, std::string solver_name
     device_vector<gScalar> y0_v = toDeviceVector(TestData::get_solution_vector(mech));
 
     memoryResource_t memory(1, nSpecie);
-    auto buffers = toDeviceVector(splitToBuffers(memory));
+    auto buffers =
+        toDeviceVector(splitToBuffers(memory, TestData::pInf(mech)));
 
     auto f = [
         ode = solver,

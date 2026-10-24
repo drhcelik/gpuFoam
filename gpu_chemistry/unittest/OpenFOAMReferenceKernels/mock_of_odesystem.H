@@ -12,15 +12,8 @@ enum jacobianType { fast = 0, exact = 1 };
 //- Reference ODE system mirroring chemistryModels::Standard::derivatives and
 //  ::jacobian of OpenFOAM-dev (f31f38e312).
 //
-//  State layout mapping
-//  ~~~~~~~~~~~~~~~~~~~~
-//  OpenFOAM-dev integrates Y_0..Y_{n-1}, T (nEqns = nSpecie + 1) with the
-//  pressure held constant as a member (p_).  The gpuFoam GPU ODE system
-//  still integrates Y_0..Y_{n-1}, T, p (nEqns = nSpecie + 2) with
-//  dp/dt = 0 and a zero p row and column in the Jacobian.  The tests
-//  therefore compare the first nSpecie + 1 entries of state and derivative
-//  vectors, and the leading (nSpecie + 1)x(nSpecie + 1) block of the
-//  Jacobian, see drop_pressure() in test_utilities.H.
+//  The state is Y_0..Y_{n-1}, T (nEqns = nSpecie + 1) with the pressure
+//  held constant as a member (p_), as in the gpuFoam GPU ODE system.
 class MockOFSystem : public ODESystem {
 
     const PtrList<FoamGpu::testThermoType1>            specieThermos_;

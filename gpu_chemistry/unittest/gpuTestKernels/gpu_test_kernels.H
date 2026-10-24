@@ -23,8 +23,8 @@ lu(const std::vector<gScalar>& m_vals,
 
 TestData::odeSystemResults odesystem(TestData::Mechanism mech);
 
-//- ODE system derivative and Jacobian at the given state in the GPU
-//  layout [Y, T, p]
+//- ODE system derivative and Jacobian at the given state [Y, T] at the
+//  constant pressure pInf
 TestData::odeSystemResults odesystem(TestData::Mechanism         mech,
                                      const std::vector<gScalar>& y0);
 

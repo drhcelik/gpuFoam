@@ -48,12 +48,15 @@ public:
     /// @param deltaT Current flow time step.
     /// @param deltaTChemMax Maximum chemistry time step..
     /// @param deltaTChem Current cell-specific chemistry time steps.
-    /// @param Y The current cell-specific solution vectors [Y, T, p].
+    /// @param p The cell-specific pressures, constant during the
+    /// integration.
+    /// @param Y The current cell-specific solution vectors [Y, T].
     /// @return New solution vectors and chemistry time steps.
     std::pair<std::vector<gScalar>, std::vector<gScalar>>
     computeYNew(gScalar                     deltaT,
                 gScalar                     deltaTChemMax,
                 const std::vector<gScalar>& deltaTChem,
+                const std::vector<gScalar>& p,
                 const std::vector<gScalar>& Y);
 
     /// @brief Computes the reaction rate based on the input flow
@@ -62,8 +65,9 @@ public:
     /// @param deltaTChemMax Maximum chemistry time step.
     /// @param rho The density field.
     /// @param deltaTChem Current cell-specific chemistry time steps.
-    /// @param Yvf The current cell-specific solution vectors [Y, T,
-    /// p].
+    /// @param p The cell-specific pressures, constant during the
+    /// integration.
+    /// @param Yvf The current cell-specific solution vectors [Y, T].
     /// @return Vector of new reaction rates of size nCells x nSpecie,
     /// new chemistry time steps and the minimum new chemistry time
     /// step.
@@ -72,6 +76,7 @@ public:
               gScalar                    deltaTChemMax,
               const std::vector<gScalar>& rho,
               const std::vector<gScalar>& deltaTChem,
+              const std::vector<gScalar>& p,
               const std::vector<gScalar>& Yvf);
 
 private:

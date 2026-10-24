@@ -23,7 +23,7 @@ struct gpuBuffer {
         , sData_(sData)
         , twodSData_(twodSData)
         , nSpecie_(nSpecie)
-        , nEqns_(nSpecie + 2) {
+        , nEqns_(nSpecie + 1) {
 
         for (size_t i = 0; i < lData_.size(); ++i) {
             check_ptr(lData[i], "label pointer");
@@ -114,11 +114,19 @@ struct gpuBuffer {
         return getTwodScalarData(twoDScalarArrays::J, nEqns_, nEqns_);
     }
 
+    /// @brief The constant pressure of the current ODE integration, set
+    /// before the cell is integrated (as p_ of OpenFOAM-dev
+    /// chemistryModels::standard, 604bc31acc).
+    CUDA_HOSTDEV gScalar& p() { return p_; }
+
+    CUDA_HOSTDEV gScalar p() const { return p_; }
+
     device_array<gLabel*, N_LABEL_ARRAYS>        lData_;
     device_array<gScalar*, N_SCALAR_ARRAYS>      sData_;
     device_array<gScalar*, N_TWOD_SCALAR_ARRAYS> twodSData_;
     gLabel                                       nSpecie_;
     gLabel                                       nEqns_;
+    gScalar                                      p_ = 0;
 };
 
 } // namespace FoamGpu

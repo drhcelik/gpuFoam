@@ -13,6 +13,7 @@ struct singleCellSolver {
                      gLabel               nSpecie,
                      mdspan<gScalar, 1>   deltaTChem,
                      mdspan<gScalar, 2>   Yvf,
+                     mdspan<const gScalar, 1> p,
                      mdspan<gpuBuffer, 1> buffer,
                      gpuODESolver         ode,
                      gScalar              Treact = 0.0)
@@ -20,15 +21,19 @@ struct singleCellSolver {
         , nSpecie_(nSpecie)
         , deltaTChem_(deltaTChem)
         , Yvf_(Yvf)
+        , p_(p)
         , buffer_(buffer)
         , ode_(ode)
         , Treact_(Treact) {}
 
     CUDA_HOSTDEV void operator()(gLabel celli) const {
         auto Y = mdspan<gScalar, 1>(&Yvf_(celli, 0),
-                                    extents<1>{nSpecie_ + 2});
+                                    extents<1>{nSpecie_ + 1});
 
         if (Y[nSpecie_] > Treact_) {
+            // The pressure is held constant during the integration
+            buffer_[celli].p() = p_[celli];
+
             // Initialise time progress
             gScalar timeLeft = deltaT_;
 
@@ -54,6 +59,7 @@ struct singleCellSolver {
     gLabel               nSpecie_;
     mdspan<gScalar, 1>   deltaTChem_;
     mdspan<gScalar, 2>   Yvf_;
+    mdspan<const gScalar, 1> p_;
     mdspan<gpuBuffer, 1> buffer_;
     gpuODESolver         ode_;
     gScalar              Treact_;

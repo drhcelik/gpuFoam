@@ -16,7 +16,7 @@ struct memoryResource {
     memoryResource(gLabel nCells, gLabel nSpecie)
         : nCells_(nCells)
         , nSpecie_(nSpecie)
-        , nEqns_(nSpecie + 2) {}
+        , nEqns_(nSpecie + 1) {}
 
     virtual ~memoryResource() {}
 
@@ -47,7 +47,7 @@ protected:
 
         if ((nCells != this->nCells()) ||
             (nSpecie != this->nSpecie()) ||
-            (nSpecie + 2 != this->nEqns())) {
+            (nSpecie + 1 != this->nEqns())) {
             return true;
         }
         return false;
@@ -88,6 +88,15 @@ splitToBuffers(memoryResource& mr) {
             labelData, scalarData, twodScalarData, mr.nSpecie());
     }
 
+    return ret;
+}
+
+/// @brief Split the memory resource to per-cell buffers with the given
+/// constant pressure of the integration.
+static inline std::vector<gpuBuffer>
+splitToBuffers(memoryResource& mr, gScalar p) {
+    std::vector<gpuBuffer> ret = splitToBuffers(mr);
+    for (auto& b : ret) { b.p() = p; }
     return ret;
 }
 

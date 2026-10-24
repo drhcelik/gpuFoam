@@ -45,7 +45,7 @@ void gpuMemoryResource::resize(gLabel nCells, gLabel nSpecie) {
         this->deallocate();
         nCells_  = nCells;
         nSpecie_ = nSpecie;
-        nEqns_   = nSpecie + 2;
+        nEqns_   = nSpecie + 1;
         this->allocate();
     }
 }

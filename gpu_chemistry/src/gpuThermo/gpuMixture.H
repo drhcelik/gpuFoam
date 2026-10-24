@@ -20,8 +20,11 @@ struct gpuMixture {
 
     /// @brief Computes the mixture properties required by the
     /// Jacobian calculation.
-    /// @param y [IN] A span containing specie mass fractions,
-    /// temperature and pressure.
+    /// @param y [IN] A span containing specie mass fractions and
+    /// temperature.
+    /// @param T [IN] The temperature at which the properties are
+    /// evaluated (e.g. limited to the reaction scheme limits).
+    /// @param p [IN] The constant pressure of the integration.
     /// @param Cp [OUT] A span containing the species heat capacities.
     /// @param Ha [OUT] A span containing the species absolute
     /// enthalpies.
@@ -32,24 +35,13 @@ struct gpuMixture {
     /// thermal expansion, respectively.
     CUDA_HOSTDEV device_array<gScalar, 4>
     computeJacobianRequired(const mdspan<const gScalar, 1> y,
-                            mdspan<gScalar, 1>             Cp,
-                            mdspan<gScalar, 1>             Ha,
-                            mdspan<gScalar, 1>             c) {
-        return computeJacobianRequired(y, y[y.size() - 2], Cp, Ha, c);
-    }
-
-    /// @brief As above but evaluated at the given temperature T rather
-    /// than the temperature in y (e.g. a temperature clamped to the
-    /// reaction scheme limits).
-    CUDA_HOSTDEV device_array<gScalar, 4>
-    computeJacobianRequired(const mdspan<const gScalar, 1> y,
                             const gScalar                  T,
+                            const gScalar                  p,
                             mdspan<gScalar, 1>             Cp,
                             mdspan<gScalar, 1>             Ha,
                             mdspan<gScalar, 1>             c) {
 
-        const gLabel  nSpecie = y.size() - 2;
-        const gScalar p       = y[nSpecie + 1];
+        const gLabel nSpecie = y.size() - 1;
 
         gScalar rhoM   = 0.0;
         gScalar CpM    = 0.0;
@@ -89,8 +81,11 @@ struct gpuMixture {
 
     /// @brief Computes the mixture properties required by the
     /// derivative calculation.
-    /// @param y [IN] A span containing specie mass fractions,
-    /// temperature and pressure.
+    /// @param y [IN] A span containing specie mass fractions and
+    /// temperature.
+    /// @param T [IN] The temperature at which the properties are
+    /// evaluated (e.g. limited to the reaction scheme limits).
+    /// @param p [IN] The constant pressure of the integration.
     /// @param Ha [OUT] A span containing the species absolute
     /// enthalpies.
     /// @param c [OUT] A span containing the species concetrations.
@@ -98,22 +93,12 @@ struct gpuMixture {
     /// density and specific heat, respectively.
     CUDA_HOSTDEV device_array<gScalar, 2>
     computeDerivativeRequired(const mdspan<const gScalar, 1> y,
-                              mdspan<gScalar, 1>             Ha,
-                              mdspan<gScalar, 1>             c) {
-        return computeDerivativeRequired(y, y[y.size() - 2], Ha, c);
-    }
-
-    /// @brief As above but evaluated at the given temperature T rather
-    /// than the temperature in y (e.g. a temperature clamped to the
-    /// reaction scheme limits).
-    CUDA_HOSTDEV device_array<gScalar, 2>
-    computeDerivativeRequired(const mdspan<const gScalar, 1> y,
                               const gScalar                  T,
+                              const gScalar                  p,
                               mdspan<gScalar, 1>             Ha,
                               mdspan<gScalar, 1>             c) {
 
-        const gLabel  nSpecie = y.size() - 2;
-        const gScalar p       = y[nSpecie + 1];
+        const gLabel nSpecie = y.size() - 1;
 
         gScalar rhoM = 0.0;
         gScalar CpM  = 0.0;

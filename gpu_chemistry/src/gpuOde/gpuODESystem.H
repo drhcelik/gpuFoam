@@ -39,7 +39,7 @@ private:
     /// @param rhoM Mixture density.
     CUDA_HOSTDEV void dYdT(mdspan<gScalar, 1> dydt,
                            const gScalar      rhoM) const {
-        const gLabel nSpecie = nEqns() - 2;
+        const gLabel nSpecie = nEqns() - 1;
         // Reactions return dNdtByV, so we need to convert the result
         // to dYdt
         for (gLabel i = 0; i < nSpecie; i++) {
@@ -54,7 +54,7 @@ private:
                               const mdspan<const gScalar, 1> Ha,
                               const gScalar CpM) const {
 
-        const gLabel nSpecie = nEqns() - 2;
+        const gLabel nSpecie = nEqns() - 1;
         gScalar      ret     = 0.0;
         for (gLabel i = 0; i < nSpecie; i++) {
             ret -= dydx[i] * Ha[i];
@@ -70,12 +70,12 @@ private:
                                const gScalar                  alphavM,
                                const gScalar                  p,
                                const gScalar T) const {
-        const gLabel nSpecie = nEqns() - 2;
+        const gLabel nSpecie = nEqns() - 1;
 
         for (gLabel i = 0; i < nSpecie; i++) {
             const gScalar WiByrhoM = specieThermos()[i].W() / rhoM;
 
-            for (gLabel j = 0; j < (nSpecie + 2); ++j) {
+            for (gLabel j = 0; j < (nSpecie + 1); ++j) {
                 temp[j] = dfdy(i, j);
             }
 
@@ -98,7 +98,6 @@ private:
 
             dfdy(i, nSpecie) =
                 WiByrhoM * ddNidtByVdT + alphavM * dydx[i];
-            dfdy(i, nSpecie + 1) = gScalar(0);
         }
     }
 
@@ -111,7 +110,7 @@ private:
                                const mdspan<const gScalar, 1> Ha,
                                const gScalar CpM) const {
 
-        const gLabel nSpecie = nEqns() - 2;
+        const gLabel nSpecie = nEqns() - 1;
 
         // d(dTdt)/dY
         for (gLabel i = 0; i < nSpecie; i++) {
@@ -133,7 +132,7 @@ private:
                                const gScalar                  CpM,
                                const gScalar dCpMdT) const {
 
-        const gLabel nSpecie = nEqns() - 2;
+        const gLabel nSpecie = nEqns() - 1;
 
         // d(dTdt)/dT
         dfdy(nSpecie, nSpecie) = gScalar(0);
@@ -177,18 +176,21 @@ public:
 
         for (gLabel i = 0; i < nEqns(); ++i) { dydx[i] = 0; }
 
-        const gLabel nSpecie = nEqns() - 2;
+        const gLabel nSpecie = nEqns() - 1;
 
         // Local copy of T limited to the reaction scheme limits, used for
         // both the thermo and the reaction rates; y is not modified
         const gScalar T = limitT(y[nSpecie]);
-        const gScalar p = y[nSpecie + 1];
+
+        // The pressure is constant during the integration, as p_ of
+        // OpenFOAM-dev chemistryModels::standard (604bc31acc)
+        const gScalar p = buffer.p();
 
         gpuMixture mixture(thermos_);
         auto       Ha = buffer.tempField1();
         auto       c  = buffer.c();
 
-        const auto pair = mixture.computeDerivativeRequired(y, T, Ha, c);
+        const auto pair = mixture.computeDerivativeRequired(y, T, p, Ha, c);
         const auto rhoM = pair[0];
         const auto CpM = pair[1]; 
 
@@ -202,9 +204,6 @@ public:
 
         // dT/dt
         dydx[nSpecie] = dTdt(dydx, Ha, CpM);
-
-        // dp/dt
-        dydx[nSpecie + 1] = gScalar(0);
     }
 
     CUDA_HOSTDEV void jacobian(const mdspan<const gScalar, 1> y,
@@ -220,19 +219,22 @@ public:
             }
         }
 
-        const gLabel nSpecie = nEqns() - 2;
+        const gLabel nSpecie = nEqns() - 1;
 
         // Local copy of T limited to the reaction scheme limits, used for
         // both the thermo and the reaction rates; y is not modified
         const gScalar T = limitT(y[nSpecie]);
-        const gScalar p = y[nSpecie + 1];
+
+        // The pressure is constant during the integration, as p_ of
+        // OpenFOAM-dev chemistryModels::standard (604bc31acc)
+        const gScalar p = buffer.p();
 
         gpuMixture mixture(thermos_);
         auto       Cp = buffer.tempField1();
         auto       Ha = buffer.tempField2();
         auto       c  = buffer.c();
 
-        const auto arr = mixture.computeJacobianRequired(y, T, Cp, Ha, c);
+        const auto arr = mixture.computeJacobianRequired(y, T, p, Cp, Ha, c);
         const auto rhoM = arr[0];
         const auto CpM = arr[1];
         const auto dCpMdT = arr[2];
@@ -265,9 +267,6 @@ public:
         // dT/dt
         dfdx[nSpecie] = dTdt(dfdx, Ha, CpM);
 
-        // dp/dt
-        dfdx[nSpecie + 1] = gScalar(0);
-
         ////////////////////////////////
 
         // Temporary array to allow for re-using dfdy
@@ -279,19 +278,6 @@ public:
 
         // d(dTdt)/dT
         ddT_dtdT(dfdy, dfdx, Cp, Ha, CpM, dCpMdT);
-
-        /*
-        // d(dTdt)/dp = 0 (pressure is assumed constant)
-        dfdy(nSpecie, nSpecie + 1) = gScalar(0);
-
-
-
-        // d(dpdt)/dYiTp = 0 (pressure is assumed constant)
-        for (gLabel i=0; i<nSpecie + 2; i++)
-        {
-            dfdy(nSpecie + 1, i) = gScalar(0);
-        }
-        */
     }
 };
 

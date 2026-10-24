@@ -372,7 +372,6 @@ TestData::odeSystemResults odesystem(TestData::Mechanism mech)
     std::vector<gScalar> t(nEqns);
     fill_linear(t);
     t[nSpecie] = TestData::TInf(mech);
-    t[nSpecie + 1] = TestData::pInf(mech);
     return odesystem(mech, t);
 }
 
@@ -400,6 +399,7 @@ TestData::odeSystemResults odesystem
 
 
     const device_vector<gScalar> y0_v = toDeviceVector(y0);
+    const gScalar p = TestData::pInf(mech);
 
 
 
@@ -407,7 +407,7 @@ TestData::odeSystemResults odesystem
 
     {
         memoryResource_t memory(1, nSpecie);
-        auto buffers = toDeviceVector(splitToBuffers(memory));
+        auto buffers = toDeviceVector(splitToBuffers(memory, p));
 
         device_vector<gScalar> dy_v(nEqns);
         auto f =
@@ -430,7 +430,7 @@ TestData::odeSystemResults odesystem
     {
 
         memoryResource_t memory(1, nSpecie);
-        auto buffers = toDeviceVector(splitToBuffers(memory));
+        auto buffers = toDeviceVector(splitToBuffers(memory, p));
         device_vector<gScalar> dy_v(nEqns);
         device_vector<gScalar> J_v(nEqns*nEqns);
 
@@ -490,7 +490,6 @@ std::vector<gScalar> ode_solve(TestData::Mechanism mech, std::string solver_name
         std::vector<gScalar> t(nEqns);
         fill_linear(t);
         t[nSpecie] = TestData::TInf(mech);
-        t[nSpecie + 1] = TestData::pInf(mech);
         return toDeviceVector(t);
     }();
     */
@@ -498,7 +497,8 @@ std::vector<gScalar> ode_solve(TestData::Mechanism mech, std::string solver_name
     device_vector<gScalar> y0_v = toDeviceVector(TestData::get_solution_vector(mech));
 
     memoryResource_t memory(1, nSpecie);
-    auto buffers = toDeviceVector(splitToBuffers(memory));
+    auto buffers =
+        toDeviceVector(splitToBuffers(memory, TestData::pInf(mech)));
 
     auto f = [
         ode = solver,
@@ -537,7 +537,7 @@ bool test_memory_resource(TestData::Mechanism mech, gLabel nCells){
     auto op = [nSpecie = nSpecie, buffs = buffers_span] DEVICE (gLabel celli) {
 
         gpuBuffer& buffer = buffs[celli];
-        //gLabel nEqns = nSpecie + 2;
+        //gLabel nEqns = nSpecie + 1;
 
         auto assign_label = [=] DEVICE (mdspan<gLabel, 1> s){
             for (gLabel i = 0; i < s.size(); ++i){
@@ -580,7 +580,6 @@ bool test_memory_resource(TestData::Mechanism mech, gLabel nCells){
         assign_oned_scalar(buffer.c());
         auto c = buffer.c();
         c[nSpecie] = gScalar(celli);
-        c[nSpecie + 1] = gScalar(celli);
 
         assign_oned_scalar(buffer.tempField1());
         assign_oned_scalar(buffer.tempField2());
@@ -597,7 +596,7 @@ bool test_memory_resource(TestData::Mechanism mech, gLabel nCells){
 
     auto h_buffers = toStdVector(buffers);
 
-    gLabel nEqns = nSpecie + 2;
+    gLabel nEqns = nSpecie + 1;
 
 
     for (size_t celli = 0; celli < h_buffers.size(); ++celli){
@@ -718,12 +717,18 @@ bool test_single_cell_solver(TestData::Mechanism mech, gLabel nCells){
     std::vector<gScalar> deltaTChem_h(nCells, deltaT/10);
     auto deltaTChem_d = toDeviceVector(deltaTChem_h);
     auto deltaTChem_span = make_mdspan(deltaTChem_d, extents<1>{nCells});
+    const auto p_d = toDeviceVector
+    (
+        std::vector<gScalar>(nCells, TestData::pInf(mech))
+    );
+    const auto p_span = make_mdspan(p_d, extents<1>{nCells});
 
     singleCellSolver op(
         deltaT,
         nSpecie,
         deltaTChem_span,
         Y_span,
+        p_span,
         buffers_span,
         ode
     );
@@ -793,6 +798,7 @@ bool test_evaluator(gLabel nCells){
         deltaT,
         deltaTChemMax,
         deltaTChem,
+        std::vector<gScalar>(nCells, TestData::pInf(m)),
         Yvf
     );
 

@@ -34,7 +34,6 @@ template<class cpuThermoType>
 std::vector<gScalar> gpuChemistryModel<cpuThermoType>::getY0() const {
     const PtrList<volScalarField>& Yvf = this->thermo().Y();
 
-    const volScalarField& p = this->thermo().p().oldTime();
     const volScalarField& T = this->thermo().T().oldTime();
 
     std::vector<gScalar> Y0(nCells() * nEqns());
@@ -45,8 +44,7 @@ std::vector<gScalar> gpuChemistryModel<cpuThermoType>::getY0() const {
         for (label i = 0; i < nSpecie(); ++i) {
             s(celli, i) = Yvf[i].oldTime()[celli];
         }
-        s(celli, nSpecie())     = T[celli];
-        s(celli, nSpecie() + 1) = p[celli];
+        s(celli, nSpecie()) = T[celli];
     }
 
     return Y0;
@@ -115,8 +113,9 @@ gpuChemistryModel<cpuThermoType>::gpuChemistryModel(const fluidMulticomponentThe
 
 template<class cpuThermoType>
 label gpuChemistryModel<cpuThermoType>::nEqns() const {
-    // nEqns = number of species + temperature + pressure
-    return this->nSpecie() + 2;
+    // nEqns = number of species + temperature, the pressure is constant
+    // during the integration as in OpenFOAM-dev (604bc31acc)
+    return this->nSpecie() + 1;
 }
 
 template<class cpuThermoType>
@@ -152,7 +151,7 @@ void gpuChemistryModel<cpuThermoType>::calculate() {
     const volScalarField& Tvf = this->thermo().T();
     const volScalarField& pvf = this->thermo().p();
 
-    scalarField dNdtByV(this->nSpecie() + 2);
+    scalarField dNdtByV(this->nSpecie() + 1);
 
     const PtrList<volScalarField>& Yvf = this->thermo().Y();
 
@@ -275,7 +274,7 @@ gpuChemistryModel<cpuThermoType>::specieReactionRR(const label reactioni) const 
     const volScalarField& Tvf = this->thermo().T();
     const volScalarField& pvf = this->thermo().p();
 
-    scalarField dNdtByV(this->nSpecie() + 2);
+    scalarField dNdtByV(this->nSpecie() + 1);
 
 
     const auto& R = reactions_[reactioni];
@@ -341,10 +340,10 @@ scalar gpuChemistryModel<cpuThermoType>::computeRRAndChemDeltaT(const scalar& de
 
     /*
     auto [RR, deltaTChem, minDeltaT] = evaluator_.computeRR(
-        deltaT, deltaTChemMax_, getRho0(), getDeltaTChem(), getY0());
+        deltaT, deltaTChemMax_, getRho0(), getDeltaTChem(), getP0(), getY0());
     */
     auto tpl = evaluator_.computeRR(
-        deltaT, deltaTChemMax_, getRho0(), getDeltaTChem(), getY0());
+        deltaT, deltaTChemMax_, getRho0(), getDeltaTChem(), getP0(), getY0());
 
     auto RR = std::get<0>(tpl);
     auto deltaTChem = std::get<1>(tpl);
@@ -382,7 +381,7 @@ gpuChemistryModel<cpuThermoType>::tc() const {
     const volScalarField& Tvf = this->thermo().T();
     const volScalarField& pvf = this->thermo().p();
 
-    scalarField dNdtByV(this->nSpecie() + 2);
+    scalarField dNdtByV(this->nSpecie() + 1);
 
     const PtrList<volScalarField>& Yvf = this->thermo().Y();
 

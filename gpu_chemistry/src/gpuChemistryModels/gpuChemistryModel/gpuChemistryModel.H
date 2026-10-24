@@ -61,12 +61,12 @@ private:
     /// @return Vector of chemistry time step values.
     std::vector<gScalar> getDeltaTChem() const;
 
-    /// @brief Get a flat vector of size nCells x (nSpecie + 2) corresponding to
-    /// specie mass fraction values + temperature + pressure in each cell. The
-    /// layout of the vector is [Y0_1, Y0_2 ...], where each Y0_i corresponds to
-    /// the solution vector of cell i.
-    /// @return Flat vector mass fractions, temperature and pressure in each
-    /// cell.
+    /// @brief Get a flat vector of size nCells x (nSpecie + 1) corresponding to
+    /// specie mass fraction values + temperature in each cell. The layout of
+    /// the vector is [Y0_1, Y0_2 ...], where each Y0_i corresponds to the
+    /// solution vector of cell i. The pressure is not integrated but held
+    /// constant, see getP0().
+    /// @return Flat vector mass fractions and temperature in each cell.
     std::vector<gScalar> getY0() const;
 
     /// @brief Builds the gpuKernel from the corresponding user inputs and cpu
@@ -108,7 +108,7 @@ public:
     virtual ~gpuChemistryModel() {}
 
     /// @brief Get the number of equations in the chemistry system (nSpecie +
-    /// 2).
+    /// 1).
     /// @return Number of equations in the chemistry system.
     label nEqns() const;
 

@@ -19,8 +19,10 @@ static inline gLabel speciesCount(Mechanism m) {
     }
 }
 
+//- Number of equations of the ODE system [Y, T]; the pressure is constant
+//  during the integration (OpenFOAM-dev 604bc31acc), see pInf
 static inline gLabel equationCount(Mechanism m) {
-    return speciesCount(m) + 2;
+    return speciesCount(m) + 1;
 }
 
 static inline gScalar pInf(Mechanism m) {
@@ -46,7 +48,6 @@ template <class T> static inline void assign_gri(T& f) {
     constexpr double O2_val  = 0.5;
     constexpr double N2_val  = 0.3;
     double           T_inf   = TInf(Mechanism::GRI);
-    double           p_inf   = pInf(Mechanism::GRI);
 
     gLabel nSpecie = speciesCount(GRI);
 
@@ -56,7 +57,6 @@ template <class T> static inline void assign_gri(T& f) {
     f[N2_idx]  = N2_val;
 
     f[nSpecie]     = T_inf;
-    f[nSpecie + 1] = p_inf;
 }
 
 template <class T> static inline void assign_h2(T& f) {
@@ -69,7 +69,6 @@ template <class T> static inline void assign_h2(T& f) {
     constexpr double O2_val = 0.2;
     constexpr double N2_val = 0.6;
     double           T_inf  = TInf(Mechanism::H2);
-    double           p_inf  = pInf(Mechanism::H2);
 
     gLabel nSpecie = speciesCount(H2);
 
@@ -79,7 +78,6 @@ template <class T> static inline void assign_h2(T& f) {
     f[O2_idx] = O2_val;
 
     f[nSpecie]     = T_inf;
-    f[nSpecie + 1] = p_inf;
 }
 
 template <class T> static inline void assign_yao(T& f) {
@@ -92,7 +90,6 @@ template <class T> static inline void assign_yao(T& f) {
     constexpr double O2_val      = 0.2;
     constexpr double N2_val      = 0.6;
     double           T_inf       = TInf(Mechanism::YAO);
-    double           p_inf       = pInf(Mechanism::YAO);
 
     gLabel nSpecie = speciesCount(YAO);
 
@@ -102,7 +99,6 @@ template <class T> static inline void assign_yao(T& f) {
     f[O2_idx]      = O2_val;
 
     f[nSpecie]     = T_inf;
-    f[nSpecie + 1] = p_inf;
 }
 
 // Global one-step CH4 mechanism with fractional orders (CH4^0.2 O2^1.3).
@@ -126,7 +122,6 @@ template <class T> static inline void assign_ch4_1step(T& f) {
     f[N2_idx]  = 0.7;
 
     f[nSpecie]     = TInf(Mechanism::CH4_1STEP);
-    f[nSpecie + 1] = pInf(Mechanism::CH4_1STEP);
 }
 
 template <class T>
@@ -152,7 +147,7 @@ static inline void assign_test_concentration(T& f, Mechanism m) {
             "Field size not matching mechanism specie count");
     }
 
-    std::vector<gScalar> temp(nSpecie + 2);
+    std::vector<gScalar> temp(nSpecie + 1);
     assign_test_condition(temp, m);
 
     std::copy(temp.begin(), temp.begin() + nSpecie, f.begin());

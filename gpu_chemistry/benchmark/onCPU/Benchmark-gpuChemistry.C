@@ -109,7 +109,7 @@ TEST_CASE("gpuODESystem"){
     device_vector<gScalar> J(nEqns * nEqns);
 
     memoryResource_t memory(nCells, nSpecie);
-    auto buffers = toDeviceVector(splitToBuffers(memory));
+    auto buffers = toDeviceVector(splitToBuffers(memory, TestData::pInf(mech)));
 
     auto op1 = [        =,
                 buffers = make_mdspan(buffers, extents<1>{1}),
@@ -752,7 +752,7 @@ TEST_CASE("gpuODESolver"){
 
 
     memoryResource_t memory(nCells, nSpecie);
-    auto buffers = toDeviceVector(splitToBuffers(memory));
+    auto buffers = toDeviceVector(splitToBuffers(memory, TestData::pInf(mech)));
 
     const gScalar dx = 1E-7;
 

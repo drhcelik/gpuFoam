@@ -179,8 +179,7 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
         dNdtByV[i] =
             std::vector<gScalar>(dNdtByV_f.begin(), dNdtByV_f.end());
 
-        // Reference is (nSpecie + 1)^2 in OpenFOAM-dev's [c, T] layout;
-        // compare with the GPU result via drop_pressure_matrix()
+        // (nSpecie + 1)^2 in the [c, T] layout
         Foam::scalarSquareMatrix ddNdtByVdcT_f(nEqnsRef, 0);
 
         dNdtByV_f = 0; // probably not necessary
@@ -237,20 +236,17 @@ lu(const std::vector<gScalar>& m_vals,
 
 TestData::odeSystemResults odesystem(TestData::Mechanism mech) {
     const gLabel       nSpecie = TestData::speciesCount(mech);
-    // OpenFOAM-dev layout [Y, T]; p is held by the system (pInf)
-    const gLabel       nEqns   = TestData::equationCount(mech) - 1;
+    // [Y, T]; p is held by the system (pInf)
+    const gLabel       nEqns   = TestData::equationCount(mech);
     Foam::MockOFSystem system(mech);
     system.setPressure(TestData::pInf(mech));
 
     TestData::odeSystemResults ret;
 
     const Foam::scalarField y0 = [=]() {
-        // Fill in the GPU layout [Y, T, p] so that the Y values are
-        // identical to those of the GPU test, then drop p
-        Foam::scalarField y0_t(TestData::equationCount(mech));
+        Foam::scalarField y0_t(nEqns);
         fill_linear(y0_t);
         y0_t[nSpecie]     = TestData::TInf(mech);
-        y0_t.setSize(nSpecie + 1);
 
         // std::vector<gScalar> y0_vec =
         // TestData::get_solution_vector(mech);
@@ -280,10 +276,9 @@ TestData::odeSystemResults odesystem(TestData::Mechanism mech) {
 
 TestData::odeSystemResults odesystem(TestData::Mechanism         mech,
                                      const std::vector<gScalar>& y0) {
-    const gLabel       nSpecie = TestData::speciesCount(mech);
-    const gLabel       nEqns   = nSpecie + 1;
+    const gLabel       nEqns   = TestData::equationCount(mech);
     Foam::MockOFSystem system(mech);
-    system.setPressure(y0.back());
+    system.setPressure(TestData::pInf(mech));
 
     Foam::scalarField y(nEqns);
     std::copy(y0.begin(), y0.begin() + nEqns, y.begin());
@@ -333,12 +328,10 @@ std::vector<gScalar> ode_solve(TestData::Mechanism mech,
     auto ode = Foam::ODESolver::New(system, dict);
 
     Foam::scalarField y = [&]() {
-        // GPU layout [Y, T, p] -> OpenFOAM-dev layout [Y, T] with p set on
-        // the system
         std::vector<gScalar> v = TestData::get_solution_vector(mech);
-        system.setPressure(v.back());
-        Foam::scalarField    ret(v.size() - 1);
-        std::copy(v.begin(), v.end() - 1, ret.begin());
+        system.setPressure(TestData::pInf(mech));
+        Foam::scalarField    ret(v.size());
+        std::copy(v.begin(), v.end(), ret.begin());
         return ret;
     }();
 

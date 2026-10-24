@@ -38,6 +38,7 @@ GpuKernelEvaluator::computeYNew(
     gScalar                     deltaT,
     gScalar                     deltaTChemMax,
     const std::vector<gScalar>& deltaTChem,
+    const std::vector<gScalar>& p,
     const std::vector<gScalar>& Y) {
 
     const gLabel nCells = deltaTChem.size();
@@ -47,15 +48,18 @@ GpuKernelEvaluator::computeYNew(
     // Convert fields from host to device
     auto ddeltaTChem_arr = toDeviceVector(deltaTChem);
     auto dYvf_arr        = toDeviceVector(Y);
+    auto dp_arr          = toDeviceVector(p);
     auto ddeltaTChem =
         make_mdspan(ddeltaTChem_arr, extents<1>{nCells});
     auto dYvf = make_mdspan(dYvf_arr, extents<2>{nCells, nEqns_});
+    auto dp   = mdspan<const gScalar, 1>(
+        make_raw_pointer(dp_arr.data()), extents<1>{nCells});
 
     auto buffers     = toDeviceVector(splitToBuffers(memory_));
     auto buffer_span = make_mdspan(buffers, extents<1>{nCells});
 
     singleCellSolver op(
-        deltaT, nSpecie_, ddeltaTChem, dYvf, buffer_span, solver_, Treact_);
+        deltaT, nSpecie_, ddeltaTChem, dYvf, dp, buffer_span, solver_, Treact_);
 
     for_each_index(op, nCells);
 
@@ -68,11 +72,12 @@ GpuKernelEvaluator::computeRR(gScalar deltaT,
                               gScalar deltaTChemMax,
                               const std::vector<gScalar>& rho,
                               const std::vector<gScalar>& deltaTChem,
+                              const std::vector<gScalar>& p,
                               const std::vector<gScalar>& Y) {
 
     const gLabel nCells = rho.size();
 
-    auto pair     = computeYNew(deltaT, deltaTChemMax, deltaTChem, Y);
+    auto pair     = computeYNew(deltaT, deltaTChemMax, deltaTChem, p, Y);
     auto YNew_arr = std::get<0>(pair);
     auto deltaTChemNew = std::get<1>(pair);
 
