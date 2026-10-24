@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "cuda_host_dev.H"
 #include "gpuThermo.H"
 #include "gpu_constants.H"

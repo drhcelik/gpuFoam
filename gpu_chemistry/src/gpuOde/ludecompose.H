@@ -1,7 +1,10 @@
 #pragma once
 
+#include <cmath>
+
 #include "cuda_host_dev.H"
 #include "gpu_constants.H"
+#include "mdspan.H"
 #include "swap.H"
 
 namespace FoamGpu {

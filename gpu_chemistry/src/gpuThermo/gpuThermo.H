@@ -1,4 +1,6 @@
 #pragma once
+#include <cmath>
+
 #include "cuda_host_dev.H"
 #include "device_array.H"
 #include "gpuPerfectGas.H"

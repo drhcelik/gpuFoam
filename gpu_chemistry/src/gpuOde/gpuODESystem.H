@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "check_ptr.H"
 #include "cuda_host_dev.H"
 #include "gpuBuffer.H"

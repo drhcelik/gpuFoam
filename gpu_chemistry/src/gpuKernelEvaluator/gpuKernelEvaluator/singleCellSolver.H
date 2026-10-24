@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "gpuBuffer.H"
 #include "gpuODESolver.H"
 #include "gpu_constants.H"
