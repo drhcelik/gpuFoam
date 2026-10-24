@@ -76,7 +76,7 @@ FoamGpu::GpuKernelEvaluator gpuChemistryModel<cpuThermoType>::makeEvaluator(
         gpu_thermos,
         gpu_reactions,
         FoamGpu::read_gpuODESolverInputs(
-            chemistryProperties.subDict("odeCoeffs")),
+            chemistryProperties.typeDict("ode")),
         Treact);
 }
 
