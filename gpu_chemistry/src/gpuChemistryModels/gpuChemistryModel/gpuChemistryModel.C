@@ -177,6 +177,8 @@ void gpuChemistryModel<cpuThermoType>::calculate() {
 
     List<label> cTos; // Note! not allocated!
 
+    reactionEvaluationScope scope(*this);
+
     const label nZoneCells = zone_.nCells();
     for (label zci = 0; zci < nZoneCells; zci++) {
         const label celli = zone_.celli(zci);
@@ -231,6 +233,8 @@ gpuChemistryModel<cpuThermoType>::reactionRR(const label reactioni) const {
 
     reaction::state rs(this->nSpecie());
     scalarField&    c = rs.c;
+
+    reactionEvaluationScope scope(*this);
 
     const label nZoneCells = zone_.nCells();
     for (label zci = 0; zci < nZoneCells; zci++) {
@@ -303,6 +307,8 @@ gpuChemistryModel<cpuThermoType>::specieReactionRR(const label reactioni) const 
     reaction::state rs(this->nSpecie());
     scalarField&    c = rs.c;
 
+
+    reactionEvaluationScope scope(*this);
 
     const label nZoneCells = zone_.nCells();
     for (label zci = 0; zci < nZoneCells; zci++) {
@@ -427,6 +433,8 @@ gpuChemistryModel<cpuThermoType>::tc() const {
 
     List<label> cTos; // Note! not allocated!
 
+    reactionEvaluationScope scope(*this);
+
     const label nZoneCells = zone_.nCells();
     for (label zci = 0; zci < nZoneCells; zci++) {
         const label celli = zone_.celli(zci);
@@ -494,6 +502,8 @@ gpuChemistryModel<cpuThermoType>::Qdot() const {
     const PtrList<volScalarField>& Yvf = this->thermo().Y();
 
     scalarField& Qdot = tQdot.ref();
+
+    reactionEvaluationScope scope(*this);
 
     const label nZoneCells = zone_.nCells();
 

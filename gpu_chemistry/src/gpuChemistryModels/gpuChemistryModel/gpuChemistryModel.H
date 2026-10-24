@@ -31,6 +31,27 @@ class gpuChemistryModel : public chemistryModel {
 public:
 
 private:
+    /// @brief Class to call the reactions' pre- and post-evaluate functions
+    /// around the host evaluation of the reactions, as
+    /// OpenFOAM-dev chemistryModels::Standard::reactionEvaluationScope.
+    class reactionEvaluationScope {
+        const gpuChemistryModel<cpuThermoType>& chemistry_;
+
+    public:
+        reactionEvaluationScope(const gpuChemistryModel<cpuThermoType>& chemistry)
+            : chemistry_(chemistry) {
+            forAll(chemistry_.reactions_, i) {
+                chemistry_.reactions_[i].preEvaluate();
+            }
+        }
+
+        ~reactionEvaluationScope() {
+            forAll(chemistry_.reactions_, i) {
+                chemistry_.reactions_[i].postEvaluate();
+            }
+        }
+    };
+
     //- Optional cellZone to limit where the chemistry is integrated
     generatedCellZone zone_;
 
