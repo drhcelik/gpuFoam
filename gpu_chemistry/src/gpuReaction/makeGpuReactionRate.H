@@ -31,6 +31,20 @@ static gpu::LandauTeller make_LandauTeller(const Foam::dictionary& dict) {
                              dict.lookup<gScalar>("C"));
 }
 
+static gpu::Janev make_Janev(const Foam::dictionary& dict) {
+    using namespace Foam;
+
+    const FixedList<scalar, gpu::Janev::nb_> b(dict.lookup("b"));
+
+    gpu::Janev::coeffArray bb{};
+    for (gLabel i = 0; i < gpu::Janev::nb_; ++i) { bb[i] = b[i]; }
+
+    return gpu::Janev(dict.lookup<gScalar>("A"),
+                      dict.lookup<gScalar>("beta"),
+                      lookup_Ta(dict),
+                      bb);
+}
+
 static gpuThirdBodyEfficiencies
 make_thirdBodyEfficiencies(const Foam::speciesTable& species,
                            const Foam::dictionary&   dict) {
@@ -186,6 +200,12 @@ make_reaction_rate(const Foam::speciesTable& species,
     }
     if (reactionTypeName == "irreversibleLandauTeller") {
         return gpuReactionRate(make_LandauTeller(dict), true);
+    }
+    if (reactionTypeName == "reversibleJanev") {
+        return gpuReactionRate(make_Janev(dict), false);
+    }
+    if (reactionTypeName == "irreversibleJanev") {
+        return gpuReactionRate(make_Janev(dict), true);
     }
     if (reactionTypeName == "reversibleThirdBodyArrhenius") {
         return gpuReactionRate(make_thirdBodyArrhenius(species, dict),

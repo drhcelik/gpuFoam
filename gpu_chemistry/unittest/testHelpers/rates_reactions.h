@@ -250,6 +250,26 @@ R"(reactions
         B               3.1;
         C               -4.2;
     }
+
+    reversibleJanev
+    {
+        type            reversibleJanev;
+        reaction        "H + HO2 = 2OH";
+        A               7.08e+10;
+        beta            0;
+        Ta              150;
+        b               9(-0.3 0.12 -0.021 0.0035 -4.1e-4 3.2e-5 -1.5e-6 4.1e-8 -4.9e-10);
+    }
+
+    irreversibleJanev
+    {
+        type            irreversibleJanev;
+        reaction        "H2O2 + H = H2O + OH";
+        A               2.41e+10;
+        beta            0.5;
+        Ta              1997.7;
+        b               9(0.2 -0.05 0.011 -0.0012 7.5e-5 -2.6e-6 4.0e-8 1.0e-10 -6.0e-12);
+    }
 }
 Tlow            200;
 Thigh           5000;)"
