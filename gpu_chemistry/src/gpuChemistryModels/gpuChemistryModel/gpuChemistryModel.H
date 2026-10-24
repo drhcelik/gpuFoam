@@ -17,6 +17,7 @@
 
 #include "gpuKernelEvaluator.H"
 #include "multicomponentMixture.H"
+#include "generatedCellZone.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -29,6 +30,9 @@ class gpuChemistryModel : public chemistryModel {
 public:
 
 private:
+    //- Optional cellZone to limit where the chemistry is integrated
+    generatedCellZone zone_;
+
     //- Reference to the multi component mixture
     const multicomponentMixture<cpuThermoType>& mixture_;
 
@@ -45,26 +49,32 @@ private:
     FoamGpu::GpuKernelEvaluator evaluator_;
 
 private:
-    /// @brief Get a vector of density values at old time.
+    /// @brief Get the values of the input field in the zone cells.
+    /// @param f The field.
+    /// @return Vector of the values of f in the zone cells.
+    std::vector<gScalar> getZoneValues(const scalarField& f) const;
+
+    /// @brief Get a vector of density values at old time in the zone cells.
     /// @return Vector of density values.
     std::vector<gScalar> getRho0() const;
 
-    /// @brief Get a vector of pressure values at old time.
+    /// @brief Get a vector of pressure values at old time in the zone cells.
     /// @return Vector of pressure values.
     std::vector<gScalar> getP0() const;
 
-    /// @brief Get a vector of temperature values at old time.
+    /// @brief Get a vector of temperature values at old time in the zone
+    /// cells.
     /// @return Vector of temperature values.
     std::vector<gScalar> getT0() const;
 
-    /// @brief Get a vector of chemistry time step values at old time.
+    /// @brief Get a vector of chemistry time step values in the zone cells.
     /// @return Vector of chemistry time step values.
     std::vector<gScalar> getDeltaTChem() const;
 
-    /// @brief Get a flat vector of size nCells x (nSpecie + 1) corresponding to
-    /// specie mass fraction values + temperature in each cell. The layout of
-    /// the vector is [Y0_1, Y0_2 ...], where each Y0_i corresponds to the
-    /// solution vector of cell i. The pressure is not integrated but held
+    /// @brief Get a flat vector of size nZoneCells x (nSpecie + 1)
+    /// corresponding to specie mass fraction values + temperature in each zone
+    /// cell. The layout of the vector is [Y0_1, Y0_2 ...], where each Y0_i
+    /// corresponds to the solution vector of zone cell i. The pressure is not integrated but held
     /// constant, see getP0().
     /// @return Flat vector mass fractions and temperature in each cell.
     std::vector<gScalar> getY0() const;

@@ -5,29 +5,38 @@ namespace Foam {
 namespace chemistryModels {
 
 template<class cpuThermoType>
+std::vector<gScalar>
+gpuChemistryModel<cpuThermoType>::getZoneValues(const scalarField& f) const {
+    const label          nZoneCells = zone_.nCells();
+    std::vector<gScalar> ret(nZoneCells);
+    for (label zci = 0; zci < nZoneCells; zci++) {
+        ret[zci] = f[zone_.celli(zci)];
+    }
+    return ret;
+}
+
+template<class cpuThermoType>
 std::vector<gScalar> gpuChemistryModel<cpuThermoType>::getRho0() const {
     const volScalarField& rho = this->mesh()
                                     .template lookupObject<volScalarField>(
                                         this->thermo().phasePropertyName("rho"))
                                     .oldTime();
-    return std::vector<gScalar>(rho.begin(), rho.end());
+    return getZoneValues(rho);
 }
 
 template<class cpuThermoType>
 std::vector<gScalar> gpuChemistryModel<cpuThermoType>::getP0() const {
-    const volScalarField& p = this->thermo().p().oldTime();
-    return std::vector<gScalar>(p.begin(), p.end());
+    return getZoneValues(this->thermo().p().oldTime());
 }
 
 template<class cpuThermoType>
 std::vector<gScalar> gpuChemistryModel<cpuThermoType>::getT0() const {
-    const volScalarField& T = this->thermo().T().oldTime();
-    return std::vector<gScalar>(T.begin(), T.end());
+    return getZoneValues(this->thermo().T().oldTime());
 }
 
 template<class cpuThermoType>
 std::vector<gScalar> gpuChemistryModel<cpuThermoType>::getDeltaTChem() const {
-    return std::vector<gScalar>(deltaTChem_.begin(), deltaTChem_.end());
+    return getZoneValues(deltaTChem_);
 }
 
 template<class cpuThermoType>
@@ -36,15 +45,18 @@ std::vector<gScalar> gpuChemistryModel<cpuThermoType>::getY0() const {
 
     const volScalarField& T = this->thermo().T().oldTime();
 
-    std::vector<gScalar> Y0(nCells() * nEqns());
+    const label nZoneCells = zone_.nCells();
 
-    auto s = make_mdspan(Y0, extents<2>{nCells(), nEqns()});
+    std::vector<gScalar> Y0(nZoneCells * nEqns());
 
-    for (label celli = 0; celli < nCells(); ++celli) {
+    auto s = make_mdspan(Y0, extents<2>{nZoneCells, nEqns()});
+
+    for (label zci = 0; zci < nZoneCells; zci++) {
+        const label celli = zone_.celli(zci);
         for (label i = 0; i < nSpecie(); ++i) {
-            s(celli, i) = Yvf[i].oldTime()[celli];
+            s(zci, i) = Yvf[i].oldTime()[celli];
         }
-        s(celli, nSpecie()) = T[celli];
+        s(zci, nSpecie()) = T[celli];
     }
 
     return Y0;
@@ -81,13 +93,14 @@ FoamGpu::GpuKernelEvaluator gpuChemistryModel<cpuThermoType>::makeEvaluator(
 template<class cpuThermoType>
 gpuChemistryModel<cpuThermoType>::gpuChemistryModel(const fluidMulticomponentThermo& thermo)
     : chemistryModel(thermo)
+    , zone_(this->mesh(), *this, true, true)
     , mixture_(dynamicCast<const multicomponentMixture<cpuThermoType>>(
           this->thermo()))
     , specieThermos_(mixture_.specieThermos())
     , reactions_(mixture_.species(), specieThermos_, this->mesh(), *this)
     , RR_(this->thermo().Y().size())
     , evaluator_(makeEvaluator(
-          nCells(),
+          zone_.nCells(),
           nEqns(),
           nSpecie(),
           reactions_,
@@ -145,6 +158,10 @@ template<class cpuThermoType>
 void gpuChemistryModel<cpuThermoType>::calculate() {
     if (!this->chemistry_) { return; }
 
+    if (!zone_.all()) {
+        forAll(RR_, fieldi) { RR_[fieldi] = Zero; }
+    }
+
     tmp<volScalarField>   trhovf(this->thermo().rho());
     const volScalarField& rhovf = trhovf();
 
@@ -160,7 +177,9 @@ void gpuChemistryModel<cpuThermoType>::calculate() {
 
     List<label> cTos; // Note! not allocated!
 
-    forAll(rhovf, celli) {
+    const label nZoneCells = zone_.nCells();
+    for (label zci = 0; zci < nZoneCells; zci++) {
+        const label celli = zone_.celli(zci);
         const scalar rho = rhovf[celli];
         const scalar T   = Tvf[celli];
         const scalar p   = pvf[celli];
@@ -213,8 +232,9 @@ gpuChemistryModel<cpuThermoType>::reactionRR(const label reactioni) const {
     reaction::state rs(this->nSpecie());
     scalarField&    c = rs.c;
 
-    forAll(rhovf, celli)
-    {
+    const label nZoneCells = zone_.nCells();
+    for (label zci = 0; zci < nZoneCells; zci++) {
+        const label celli = zone_.celli(zci);
         const scalar rho = rhovf[celli];
         const scalar T = Tvf[celli];
         const scalar p = pvf[celli];
@@ -284,8 +304,9 @@ gpuChemistryModel<cpuThermoType>::specieReactionRR(const label reactioni) const 
     scalarField&    c = rs.c;
 
 
-    forAll(rhovf, celli)
-    {
+    const label nZoneCells = zone_.nCells();
+    for (label zci = 0; zci < nZoneCells; zci++) {
+        const label celli = zone_.celli(zci);
         const scalar rho = rhovf[celli];
         const scalar T = Tvf[celli];
         const scalar p = pvf[celli];
@@ -338,6 +359,18 @@ scalar gpuChemistryModel<cpuThermoType>::computeRRAndChemDeltaT(const scalar& de
 
     if (!this->chemistry_) { return great; }
 
+    // As OpenFOAM-dev chemistryModels::Standard (d5522d021b) the reaction
+    // rates are zero outside the zone and the chemistry time step of the
+    // cells outside the zone is not changed
+    if (!zone_.all()) {
+        forAll(RR_, fieldi) { RR_[fieldi] = Zero; }
+    }
+
+    zone_.regenerate();
+    const label nZoneCells = zone_.nCells();
+
+    if (nZoneCells == 0) { return great; }
+
     /*
     auto [RR, deltaTChem, minDeltaT] = evaluator_.computeRR(
         deltaT, deltaTChemMax_, getRho0(), getDeltaTChem(), getP0(), getY0());
@@ -349,16 +382,14 @@ scalar gpuChemistryModel<cpuThermoType>::computeRRAndChemDeltaT(const scalar& de
     auto deltaTChem = std::get<1>(tpl);
     auto minDeltaT = std::get<2>(tpl);
 
-    auto RRs = make_mdspan(RR, extents<2>{nCells(), nSpecie()});
+    auto RRs = make_mdspan(RR, extents<2>{nZoneCells, nSpecie()});
 
-    for (label celli = 0; celli < nCells(); ++celli) {
+    for (label zci = 0; zci < nZoneCells; zci++) {
+        const label celli = zone_.celli(zci);
         for (label i = 0; i < this->nSpecie(); ++i) {
-            RR_[i][celli] = RRs(celli, i);
+            RR_[i][celli] = RRs(zci, i);
         }
-    }
-
-    for (label celli = 0; celli < nCells(); ++celli) {
-        deltaTChem_[celli] = deltaTChem[celli];
+        deltaTChem_[celli] = deltaTChem[zci];
     }
 
     return minDeltaT;
@@ -390,7 +421,9 @@ gpuChemistryModel<cpuThermoType>::tc() const {
 
     List<label> cTos; // Note! not allocated!
 
-    forAll(rhovf, celli) {
+    const label nZoneCells = zone_.nCells();
+    for (label zci = 0; zci < nZoneCells; zci++) {
+        const label celli = zone_.celli(zci);
         const scalar rho = rhovf[celli];
         const scalar T   = Tvf[celli];
         const scalar p   = pvf[celli];
@@ -456,8 +489,11 @@ gpuChemistryModel<cpuThermoType>::Qdot() const {
 
     scalarField& Qdot = tQdot.ref();
 
+    const label nZoneCells = zone_.nCells();
+
     forAll(Yvf, i) {
-        forAll(Qdot, celli) {
+        for (label zci = 0; zci < nZoneCells; zci++) {
+            const label celli = zone_.celli(zci);
             const scalar hi = specieThermos_[i].hf();
             Qdot[celli] -= hi * RR_[i][celli];
         }
