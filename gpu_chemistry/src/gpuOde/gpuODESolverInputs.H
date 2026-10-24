@@ -20,6 +20,12 @@ struct gpuODESolverInputs
     gScalar alphaDec;
     gScalar minScale;
     gScalar maxScale;
+    //semi-implicit (Rosenbrock) solver inputs
+    //- Use the scaled partial pivoting LU decomposition, otherwise the
+    //  unpivoted decomposition with row filtering (OpenFOAM-dev default)
+    bool pivot = false;
+    //- Row multiplier tolerance of the unpivoted decomposition
+    gScalar rowTol = 0;
 };
 
 }

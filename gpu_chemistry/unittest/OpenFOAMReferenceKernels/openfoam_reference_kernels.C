@@ -7,6 +7,7 @@
 #include "volFields.H"
 
 #include "mock_of_odesystem.H"
+#include "create_gpu_inputs.H"
 
 namespace OFReferenceKernels {
 
@@ -310,13 +311,23 @@ std::vector<gScalar> ode_solve(TestData::Mechanism mech,
                                std::string         solver_name,
                                gScalar             xStart,
                                gScalar             xEnd,
-                               gScalar             dxTry) {
+                               gScalar             dxTry,
+                               bool                pivot) {
     Foam::dictionary dict;
     dict.add("solver", solver_name);
-    // gpuFoam's Rosenbrock solvers use scaled partial pivoting; OpenFOAM-dev
-    // defaults to unpivoted LU with row filtering, so select pivoting to
-    // compare like with like
-    dict.add("pivot", true);
+    if (pivot)
+    {
+        dict.add("pivot", true);
+    }
+    else
+    {
+        // Same tolerances as TestData::makeGpuODEInputs so that the default
+        // rowTol = min(absTol) is the same as for the GPU solver
+        const FoamGpu::gpuODESolverInputs i =
+            TestData::makeGpuODEInputs(solver_name, mech);
+        dict.add("absTol", i.absTol);
+        dict.add("relTol", i.relTol);
+    }
     Foam::MockOFSystem system(mech);
 
     auto ode = Foam::ODESolver::New(system, dict);

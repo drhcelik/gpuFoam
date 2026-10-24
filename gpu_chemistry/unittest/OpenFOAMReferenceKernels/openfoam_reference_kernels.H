@@ -32,10 +32,14 @@ TestData::odeSystemResults odesystem(TestData::Mechanism mech);
 TestData::odeSystemResults odesystem(TestData::Mechanism         mech,
                                      const std::vector<gScalar>& y0);
 
+//- Integrate from xStart to xEnd, using the scaled partial pivoting LU
+//  decomposition if pivot is true and otherwise the unpivoted LU
+//  decomposition with row filtering (OpenFOAM-dev default)
 std::vector<gScalar> ode_solve(TestData::Mechanism mech,
                                std::string         solver_name,
                                gScalar             xStart,
                                gScalar             xEnd,
-                               gScalar             dxTry);
+                               gScalar             dxTry,
+                               bool                pivot = true);
 
 } // namespace OFReferenceKernels

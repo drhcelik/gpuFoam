@@ -129,4 +129,77 @@ LUBacksubstitute(const mdspan<const gScalar, 2> luMatrix,
     }
 }
 
+/// @brief LU decomposition without pivoting in the ikj-loop form of the
+/// OpenFOAM-dev LUDecompose(scalarSquareMatrix&, const scalar rowTol)
+/// (5e2f2eafea, 10f026fd67).  Row multipliers with magnitude <= rowTol are
+/// set to zero and the corresponding row update is skipped.
+/// @param matrix The matrix to decompose in place.
+/// @param rowTol The row multiplier tolerance.
+static inline CUDA_HOSTDEV void
+LUDecompose(mdspan<gScalar, 2> matrix, const gScalar rowTol) {
+
+    const gLabel m = static_cast<gLabel>(matrix.extents().extent(1));
+
+    for (gLabel i = 0; i < m; i++) {
+        gScalar* __restrict__ matrixi = &(matrix(i, 0));
+
+        for (gLabel k = 0; k < i; k++) {
+            const gScalar* __restrict__ matrixk = &(matrix(k, 0));
+
+            // Compute the row multiplier for the lower triangular matrix L
+            matrixi[k] /= matrixk[k];
+
+            // If the row multiplier is 0 skip the inner j loop
+            if (fabs(matrixi[k]) <= rowTol) {
+                matrixi[k] = 0;
+                continue;
+            }
+
+            // Inner 'j' loop updates the remainder of row 'i'
+            for (gLabel j = k + 1; j < m; j++) {
+                matrixi[j] -= matrixi[k] * matrixk[j];
+            }
+        }
+    }
+}
+
+/// @brief Back-substitution for the unpivoted LU decomposition as the
+/// OpenFOAM-dev LUBacksubstitute(const scalarSquareMatrix&, List<Type>&).
+/// @param luMatrix The decomposed matrix.
+/// @param sourceSol The source on input and the solution on output.
+static inline CUDA_HOSTDEV void
+LUBacksubstitute(const mdspan<const gScalar, 2> luMatrix,
+                 mdspan<gScalar, 1>             sourceSol) {
+
+    const gLabel m =
+        static_cast<gLabel>(luMatrix.extents().extent(1));
+    gLabel ii = 0;
+
+    for (gLabel i = 0; i < m; i++) {
+        gScalar sum = sourceSol[i];
+
+        const gScalar* __restrict__ luMatrixi = &(luMatrix(i, 0));
+
+        if (ii != 0) {
+            for (gLabel j = ii - 1; j < i; j++) {
+                sum -= luMatrixi[j] * sourceSol[j];
+            }
+        } else if (sum != gScalar(0)) {
+            ii = i + 1;
+        }
+
+        sourceSol[i] = sum;
+    }
+
+    for (gLabel i = m - 1; i >= 0; i--) {
+        gScalar sum = sourceSol[i];
+        const gScalar* __restrict__ luMatrixi = &(luMatrix(i, 0));
+        for (gLabel j = i + 1; j < m; j++) {
+            sum -= luMatrixi[j] * sourceSol[j];
+        }
+
+        sourceSol[i] = sum / luMatrixi[i];
+    }
+}
+
 } // namespace FoamGpu

@@ -14,6 +14,12 @@ struct gpuAdaptiveSolver : public gpuODESolverBase<System> {
     //- Step-size adjustment controls
     gScalar safeScale_, alphaInc_, alphaDec_, minScale_, maxScale_;
 
+    //- Use the scaled partial pivoting LU decomposition
+    bool pivot_;
+
+    //- Row multiplier tolerance of the unpivoted LU decomposition
+    gScalar rowTol_;
+
     gpuAdaptiveSolver() = default;
 
     /// @brief Construct from template ode system and solver inputs
@@ -26,7 +32,9 @@ struct gpuAdaptiveSolver : public gpuODESolverBase<System> {
         , alphaInc_(i.alphaInc)
         , alphaDec_(i.alphaDec)
         , minScale_(i.minScale)
-        , maxScale_(i.maxScale) {}
+        , maxScale_(i.maxScale)
+        , pivot_(i.pivot)
+        , rowTol_(i.rowTol) {}
 
     /// @brief Get the safeScale value
     /// @return Value of the safeScale
@@ -69,7 +77,27 @@ struct gpuAdaptiveSolver : public gpuODESolverBase<System> {
             a(i, i) += temp; // gScalar(1.0)/(gamma*dx);
         }
 
-        FoamGpu::LUDecompose(a, pivotIndices, buffer.lubuffer());
+        if (pivot_) {
+            FoamGpu::LUDecompose(a, pivotIndices, buffer.lubuffer());
+        } else {
+            FoamGpu::LUDecompose(a, rowTol_);
+        }
+    }
+
+    /// @brief Solve with the matrix decomposed by
+    /// computeDecomposedJacobian.
+    /// @param a The decomposed matrix.
+    /// @param pivotIndices The pivot indices (used only if pivoting).
+    /// @param k The source on input and the solution on output.
+    CUDA_HOSTDEV void
+    LUBacksubstitute(const mdspan<const gScalar, 2> a,
+                     const mdspan<const gLabel, 1>  pivotIndices,
+                     mdspan<gScalar, 1>             k) const {
+        if (pivot_) {
+            FoamGpu::LUBacksubstitute(a, pivotIndices, k);
+        } else {
+            FoamGpu::LUBacksubstitute(a, k);
+        }
     }
 };
 

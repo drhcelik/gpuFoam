@@ -78,7 +78,7 @@ public:
             k1[i] = dydx0[i] + dx * d1 * dfdx[i];
         }
 
-        FoamGpu::LUBacksubstitute(a, pivotIndices, k1);
+        this->LUBacksubstitute(a, pivotIndices, k1);
 
         // Calculate k2:
         for (gLabel i = 0; i < this->nEqns(); ++i) {
@@ -92,7 +92,7 @@ public:
             k2[i] = dydx[i] + dx * d2 * dfdx[i] + c21 * k1[i] / dx;
         }
 
-        FoamGpu::LUBacksubstitute(a, pivotIndices, k2);
+        this->LUBacksubstitute(a, pivotIndices, k2);
 
         // Calculate k3:
         auto k3 = buffer.k3();
@@ -102,7 +102,7 @@ public:
                     (c31 * k1[i] + c32 * k2[i]) / dx;
         }
 
-        FoamGpu::LUBacksubstitute(a, pivotIndices, k3);
+        this->LUBacksubstitute(a, pivotIndices, k3);
 
         // Calculate error and update state:
         auto err = buffer.err();

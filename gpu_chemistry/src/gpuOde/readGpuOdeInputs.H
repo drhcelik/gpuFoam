@@ -2,6 +2,7 @@
 
 #include "gpuODESolverInputs.H"
 #include "scalarField.H"
+#include "Switch.H"
 
 namespace FoamGpu{
 
@@ -20,6 +21,10 @@ read_gpuODESolverInputs(const Foam::dictionary& dict)
     i.alphaDec  = dict.lookupOrDefault<Foam::scalar>("alphaDecrease", 0.25);
     i.minScale  = dict.lookupOrDefault<Foam::scalar>("minScale", 0.2);
     i.maxScale  = dict.lookupOrDefault<Foam::scalar>("maxScale", 10);
+
+    // As the OpenFOAM-dev Rosenbrock solvers (759025f945)
+    i.pivot     = dict.lookupOrDefault<Foam::Switch>("pivot", false);
+    i.rowTol    = dict.lookupOrDefault<Foam::scalar>("rowTol", i.absTol);
 
 
     return i;

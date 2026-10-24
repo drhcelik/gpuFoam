@@ -74,6 +74,11 @@ FoamGpu::gpuODESolverInputs makeGpuODEInputs(std::string odeName,
     ret.minScale  = 0.2;
     ret.maxScale  = 10;
 
+    // The scaled partial pivoting LU decomposition, as used by gpuFoam
+    // before the unpivoted OpenFOAM-dev default was supported
+    ret.pivot  = true;
+    ret.rowTol = ret.absTol;
+
     return ret;
 }
 

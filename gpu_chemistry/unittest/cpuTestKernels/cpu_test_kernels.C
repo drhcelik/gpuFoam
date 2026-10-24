@@ -405,7 +405,7 @@ TestData::odeSystemResults odesystem
 }
 
 
-std::vector<gScalar> ode_solve(TestData::Mechanism mech, std::string solver_name, gScalar xStart, gScalar xEnd, gScalar dxTry)
+std::vector<gScalar> ode_solve(TestData::Mechanism mech, std::string solver_name, gScalar xStart, gScalar xEnd, gScalar dxTry, bool pivot)
 {
     using namespace FoamGpu;
 
@@ -424,6 +424,7 @@ std::vector<gScalar> ode_solve(TestData::Mechanism mech, std::string solver_name
     );
 
     gpuODESolverInputs i = TestData::makeGpuODEInputs(solver_name, mech);
+    i.pivot = pivot;
 
 
     auto solver = make_gpuODESolver(system, i);

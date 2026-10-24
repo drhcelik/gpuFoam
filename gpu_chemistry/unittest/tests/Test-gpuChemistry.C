@@ -12,6 +12,9 @@
 #include "reaction.H"
 #include "thirdBodyEfficiencies.H"
 #include "IStringStream.H"
+#include "scalarMatrices.H"
+#include "ludecompose.H"
+#include <algorithm>
 
 
 TEST_CASE("make_mdspan", "[CPU]"){
@@ -520,6 +523,58 @@ TEST_CASE("Test ludecompose (on CPU)", "[CPU]")
             Catch::Matchers::Approx(s_ref).epsilon(errorTol).margin(1e-12)
         );
 
+    }
+}
+
+
+TEST_CASE("Test unpivoted ludecompose (on CPU)", "[CPU]")
+{
+    using namespace FoamGpu;
+
+    for (int size = 3; size < 50; ++size)
+    {
+        std::vector<gScalar> vals(size*size);
+        fill_random(vals);
+
+        // Diagonally dominant as the Rosenbrock matrix I/(gamma*dx) - J for
+        // small dx, with some multipliers below rowTol
+        for (int i = 0; i < size; ++i)
+        {
+            vals[i*size + i] += size;
+            vals[i*size + (i + 1)%size] *= 1e-14;
+        }
+
+        std::vector<gScalar> source(size);
+        fill_random(source);
+
+        for (const gScalar rowTol : {0.0, 1e-12})
+        {
+            Foam::scalarSquareMatrix A(size);
+            std::copy(vals.begin(), vals.end(), A.v());
+            Foam::scalarField b(size);
+            std::copy(source.begin(), source.end(), b.begin());
+            Foam::LUDecompose(A, rowTol);
+            Foam::LUBacksubstitute(A, b);
+
+            std::vector<gScalar> m(vals);
+            std::vector<gScalar> x(source);
+            auto ms = make_mdspan(m, extents<2>{size, size});
+            auto xs = make_mdspan(x, extents<1>{size});
+            FoamGpu::LUDecompose(ms, rowTol);
+            FoamGpu::LUBacksubstitute
+            (
+                make_mdspan
+                (
+                    static_cast<const std::vector<gScalar>&>(m),
+                    extents<2>{size, size}
+                ),
+                xs
+            );
+
+            // Same operations in the same order as OpenFOAM-dev
+            CHECK(std::equal(m.begin(), m.end(), A.v()));
+            CHECK(std::equal(x.begin(), x.end(), b.begin()));
+        }
     }
 }
 
@@ -1043,6 +1098,61 @@ TEST_CASE("Test gpuOdeSolver (on CPU)", "[CPU]")
 
 }
 
+
+
+TEST_CASE("Test gpuOdeSolver unpivoted (on CPU)", "[CPU]")
+{
+    using namespace FoamGpu;
+
+    const gScalar xStart = 0.0;
+    const gScalar xEnd = 1E-6;
+    const gScalar dxTry = 1E-7;
+
+    // The OpenFOAM-dev default: unpivoted LU decomposition with row
+    // filtering (pivot false, rowTol = min(absTol))
+    for
+    (
+        const auto mech
+      : {
+            TestData::Mechanism::GRI,
+            TestData::Mechanism::YAO,
+            TestData::Mechanism::H2
+        }
+    )
+    {
+        for
+        (
+            const std::string name
+          : {"Rosenbrock12", "Rosenbrock23", "Rosenbrock34"}
+        )
+        {
+            DYNAMIC_SECTION(int(mech) << " " << name)
+            {
+                constexpr double errorTol = 1E-8;
+
+                auto test_result = drop_pressure
+                (
+                    CpuTestKernels::ode_solve
+                    (
+                        mech, name, xStart, xEnd, dxTry, false
+                    )
+                );
+                auto reference = OFReferenceKernels::ode_solve
+                (
+                    mech, name, xStart, xEnd, dxTry, false
+                );
+                remove_negative(test_result, errorTol);
+                remove_negative(reference, errorTol);
+
+                CHECK_THAT
+                (
+                    test_result,
+                    Catch::Matchers::Approx(reference).epsilon(errorTol)
+                );
+            }
+        }
+    }
+}
 
 
 TEST_CASE("Test memoryResource (on GPU)", "[GPU]")
