@@ -9,6 +9,7 @@
 #include "gpuJanevReactionRate.H"
 #include "gpuLandauTellerReactionRate.H"
 #include "gpuLindemannFallOffFunction.H"
+#include "gpuPLogReactionRate.H"
 #include "gpuSRIFallOffFunction.H"
 #include "gpuThirdBodyArrheniusReactionRate.H"
 #include "gpuTroeFallOffFunction.H"
@@ -21,6 +22,7 @@ using Arrhenius          = gpuArrheniusReactionRate;
 using ThirdBodyArrhenius = gpuThirdBodyArrheniusReactionRate;
 using LandauTeller       = gpuLandauTellerReactionRate;
 using Janev              = gpuJanevReactionRate;
+using PLog               = gpuPLogReactionRate;
 using ArrheniusLindemannFallOff =
     gpuFallOffReactionRate<gpuArrheniusReactionRate,
                            gpuLindemannFallOffFunction>;
@@ -49,7 +51,8 @@ using ReactionRate = variant::variant<Arrhenius,
                                       ArrheniusTroeChemicallyActivated,
                                       ArrheniusSRIChemicallyActivated,
                                       LandauTeller,
-                                      Janev>;
+                                      Janev,
+                                      PLog>;
 
 /*
 using ReactionRate =

@@ -270,6 +270,48 @@ R"(reactions
         Ta              1997.7;
         b               9(0.2 -0.05 0.011 -0.0012 7.5e-5 -2.6e-6 4.0e-8 1.0e-10 -6.0e-12);
     }
+
+    // The test pressure 202650 Pa is inside the pressure range
+    reversiblePLog
+    {
+        type            reversiblePLog;
+        reaction        "HO2 + H = H2 + O2";
+        coeffs
+        4
+        (
+            (1013.25 2.1e+07 1.1 -500)
+            (101325 7.5e+08 0.6 120)
+            (1013250 3.3e+10 0.1 900)
+            (10132500 1.2e+11 -0.2 1500)
+        );
+    }
+
+    // The test pressure is below the pressure range
+    irreversiblePLog
+    {
+        type            irreversiblePLog;
+        reaction        "H2O2 + O = OH + HO2";
+        coeffs
+        2
+        (
+            (506625 9.5e+03 2.0 2000)
+            (5066250 2.2e+05 1.6 2300)
+        );
+    }
+
+    // The test pressure is above the pressure range
+    reversiblePLogLow
+    {
+        type            reversiblePLog;
+        reaction        "H2O2 + OH = H2O + HO2";
+        coeffs
+        3
+        (
+            (1013.25 1.0e+09 0 0)
+            (10132.5 1.7e+09 -0.1 30)
+            (101325 5.8e+11 -0.9 4800)
+        );
+    }
 }
 Tlow            200;
 Thigh           5000;)"

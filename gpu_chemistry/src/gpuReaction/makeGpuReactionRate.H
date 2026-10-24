@@ -45,6 +45,30 @@ static gpu::Janev make_Janev(const Foam::dictionary& dict) {
                       bb);
 }
 
+static gpu::PLog make_PLog(const Foam::dictionary& dict) {
+    using namespace Foam;
+
+    // The coefficients (p A beta Ta) of each pressure, as
+    // OpenFOAM-dev pLogReactionRate
+    const List<FixedList<scalar, 4>> coeffs(dict.lookup("coeffs"));
+
+    if (coeffs.size() < 1 || coeffs.size() > gpu::PLog::nMax_) {
+        throw std::logic_error(
+            std::string("Only 1 to ") + std::to_string(gpu::PLog::nMax_) +
+            std::string(" pressures supported in pLog reactions."));
+    }
+
+    gpu::PLog::coeffArray p{}, A{}, beta{}, Ta{};
+    forAll(coeffs, i) {
+        p[i]    = coeffs[i][0];
+        A[i]    = coeffs[i][1];
+        beta[i] = coeffs[i][2];
+        Ta[i]   = coeffs[i][3];
+    }
+
+    return gpu::PLog(coeffs.size(), p, A, beta, Ta);
+}
+
 static gpuThirdBodyEfficiencies
 make_thirdBodyEfficiencies(const Foam::speciesTable& species,
                            const Foam::dictionary&   dict) {
@@ -206,6 +230,12 @@ make_reaction_rate(const Foam::speciesTable& species,
     }
     if (reactionTypeName == "irreversibleJanev") {
         return gpuReactionRate(make_Janev(dict), true);
+    }
+    if (reactionTypeName == "reversiblePLog") {
+        return gpuReactionRate(make_PLog(dict), false);
+    }
+    if (reactionTypeName == "irreversiblePLog") {
+        return gpuReactionRate(make_PLog(dict), true);
     }
     if (reactionTypeName == "reversibleThirdBodyArrhenius") {
         return gpuReactionRate(make_thirdBodyArrhenius(species, dict),
