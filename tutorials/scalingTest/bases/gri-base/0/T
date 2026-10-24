@@ -50,7 +50,7 @@ internalField  #codeStream
 
         }
 
-        writeEntry(os,"",T);
+        writeEntry(os, T);
     #};
 
     //! Optional:

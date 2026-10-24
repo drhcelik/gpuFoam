@@ -11,14 +11,14 @@ changeModel()
     MODEL=$1
 
     if [ "$MODEL" = "cpu" ]; then
-        MODEL_STR="{solver ode;}"
+        MODEL_STR="standard"
     else
-        MODEL_STR="{solver none; method gpuChemistryModel;}"
+        MODEL_STR="gpuChemistryModel"
     fi
 
 
     runApplication -a foamDictionary \
-        -entry chemistryType \
+        -entry type \
         -set "$MODEL_STR" \
         constant/chemistryProperties
 }

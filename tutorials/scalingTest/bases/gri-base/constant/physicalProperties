@@ -25,7 +25,7 @@ thermoType
     specie          specie;
 }
 
-inertSpecie N2;
+defaultSpecie N2;
 
 #include "thermoGri"
 //#include "thermoYao"

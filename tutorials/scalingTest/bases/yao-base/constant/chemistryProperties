@@ -19,11 +19,7 @@ chemistry       on;
 
 initialChemicalTimeStep 1;
 
-chemistryType
-{
-    solver          none;
-    method          gpuChemistryModel;
-}
+type            gpuChemistryModel;
 
 odeCoeffs
 {

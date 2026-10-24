@@ -47,7 +47,7 @@ internalField  #codeStream
 
         }
 
-        writeEntry(os,"",NC12H26);
+        writeEntry(os, NC12H26);
     #};
 
     //! Optional:

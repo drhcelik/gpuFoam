@@ -18,9 +18,9 @@ ODE_STR="{solver $ODE_SOLVER; absTol 1E-08; relTol 0.1;}"
 
 
 if [ "$CHEM_MODEL" = "cpu" ]; then
-    MODEL_STR="{solver ode;}"
+    MODEL_STR="standard"
 else
-    MODEL_STR="{solver none; method gpuChemistryModel;}"
+    MODEL_STR="gpuChemistryModel"
 fi
 
 
@@ -35,7 +35,7 @@ runApplication -a foamDictionary \
         system/blockMeshDict
 
 runApplication -a foamDictionary \
-        -entry chemistryType \
+        -entry type \
         -set "$MODEL_STR" \
         constant/chemistryProperties
 

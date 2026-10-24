@@ -48,7 +48,7 @@ internalField  #codeStream
 
         }
 
-        writeEntry(os,"",O2);
+        writeEntry(os, O2);
     #};
 
     //! Optional:
