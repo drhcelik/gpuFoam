@@ -48,13 +48,31 @@ Only the Rosenbrock family of ODE solvers is supported at this point.
 
 
 #### Supported reaction types
-The following list of reactions are supported:
+The following reaction rate types are supported, each as a reversible and an irreversible reaction, e.g. ```reversibleArrhenius``` and ```irreversibleArrhenius```:
 
-* reversibleArrhenius
-* irreversibleArrhenius
-* reversibleThirdBodyArrhenius
-* reversibleArrheniusLindemannFallOff
-* reversibleArrheniusTroeFallOff
+* Arrhenius
+* ThirdBodyArrhenius
+* LandauTeller
+* Janev
+* PLog (up to 16 pressures)
+* ArrheniusLindemannFallOff
+* ArrheniusTroeFallOff
+* ArrheniusSRIFallOff
+* ArrheniusLindemannChemicallyActivated
+* ArrheniusTroeChemicallyActivated
+* ArrheniusSRIChemicallyActivated
+
+The non-equilibrium reversible reactions and the surface, Michaelis-Menten, Langmuir-Hinshelwood and powerSeries rates are not supported and stop the run with an error.
+
+#### Supported chemistry model controls
+As the OpenFOAM-dev ```standard``` chemistry model, ```gpuChemistryModel``` supports:
+
+* the optional ```cellZone``` entry of ```chemistryProperties```, which limits the integration of the chemistry to the cells of the zone
+* local time stepping (LTS), i.e. the ```localEuler``` ddt scheme
+* the ```Treact``` temperature below which the chemistry is not solved
+* the ```pivot``` and ```rowTol``` controls of the LU decomposition in the ```ode``` dictionary
+
+The pressure is constant during the integration of the chemistry in each cell.
 
 
 ## Unit tests
