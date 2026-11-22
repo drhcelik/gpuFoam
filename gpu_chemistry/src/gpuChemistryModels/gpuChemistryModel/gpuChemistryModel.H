@@ -12,7 +12,8 @@
 #include "DynamicField.H"
 #include "UniformField.H"
 #include "ODESystem.H"
-#include "ReactionList.H"
+#include "reactionList.H"
+#include "specieThermosRef.H"
 
 #include "chemistryReductionMethod.H"
 
@@ -62,7 +63,7 @@ private:
     const PtrList<cpuThermoType>& specieThermos_;
 
     //- Reactions
-    const ReactionList<cpuThermoType> reactions_;
+    const reactionList reactions_;
 
     //- List of reaction rate per specie [kg/m^3/s]
     PtrList<volScalarField::Internal> RR_;
@@ -115,7 +116,7 @@ private:
     makeEvaluator(label                              nCells,
                   label                              nEqns,
                   label                              nSpecie,
-                  const ReactionList<cpuThermoType>& reactions,
+                  const reactionList&                reactions,
                   const dictionary&                  physicalProperties,
                   const dictionary&                  chemistryProperties,
                   const multicomponentMixture<cpuThermoType>& mixture);

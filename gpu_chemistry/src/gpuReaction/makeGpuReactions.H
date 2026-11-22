@@ -7,7 +7,7 @@
 #include "gpuThermo.H"
 #include "makeGpuReactionRate.H"
 
-#include "ReactionList.H"
+#include "reactionList.H"
 #include "dictionary.H"
 
 #include "scalar.H"
@@ -87,12 +87,11 @@ make_specie_coeffs(const Foam::List<Foam::specieCoeffs>& l) {
     return ret;
 }
 
-template <class ThermoType>
 static std::vector<gpuReaction> makeGpuReactions(
-    const Foam::speciesTable&             species,
-    const Foam::dictionary&               dict,
-    const std::vector<gpuThermo>&         gpu_thermos,
-    const Foam::ReactionList<ThermoType>& cpu_reactions) {
+    const Foam::speciesTable&     species,
+    const Foam::dictionary&       dict,
+    const std::vector<gpuThermo>& gpu_thermos,
+    const Foam::reactionList&     cpu_reactions) {
 
     const Foam::dictionary& reactions(dict.subDict("reactions"));
 

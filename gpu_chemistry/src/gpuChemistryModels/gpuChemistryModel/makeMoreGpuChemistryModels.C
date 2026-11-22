@@ -20,18 +20,19 @@
 #include "singleComponentMixture.H"
 
 // Reaction types
-#include "JanevReactionRate.H"
-#include "LandauTellerReactionRate.H"
-#include "makeReaction.H"
-#include "powerSeriesReactionRate.H"
-#include "thirdBodyArrheniusReactionRate.H"
+#include "Arrhenius_reactionRate.H"
+#include "Janev_reactionRate.H"
+#include "LandauTeller_reactionRate.H"
+#include "makeRateReaction.H"
+#include "powerSeries_reactionRate.H"
+#include "ThirdBody_reactionRate.H"
 
-#include "ChemicallyActivatedReactionRate.H"
-#include "FallOffReactionRate.H"
+#include "ChemicallyActivated_reactionRate.H"
+#include "FallOff_reactionRate.H"
 
-#include "LindemannFallOffFunction.H"
-#include "SRIFallOffFunction.H"
-#include "TroeFallOffFunction.H"
+#include "Lindemann_fallOffFunction.H"
+#include "SRI_fallOffFunction.H"
+#include "Troe_fallOffFunction.H"
 
 #include "forExtraCoeffGases.H"
 
@@ -56,42 +57,55 @@ forExtraCoeffGases(makeFluidMulticomponentThermos,
                    psiMulticomponentThermo,
                    coefficientWilkeMulticomponentMixture);
 
-forExtraCoeffGases(defineReaction, nullArg);
-forExtraCoeffGases(makeIRNReactions, ArrheniusReactionRate);
-forExtraCoeffGases(makeIRNReactions, LandauTellerReactionRate);
-forExtraCoeffGases(makeIRNReactions, thirdBodyArrheniusReactionRate);
-forExtraCoeffGases(makeIRNReactions, JanevReactionRate);
-forExtraCoeffGases(makeIRNReactions, powerSeriesReactionRate);
+// As OpenFOAM-dev 62be3e2828 the irreversible and non-equilibrium
+// reversible reactions do not depend on the thermo and are instantiated in
+// libspecie. Only the reversible reactions are instantiated for the
+// additional thermo types.
+namespace reactionRates {
+typedef ThirdBody<Arrhenius> ThirdBodyArrhenius;
 
-forExtraCoeffGases(makeIRTemplate2Reactions,
-                   FallOffReactionRate,
-                   ArrheniusReactionRate,
-                   LindemannFallOffFunction);
+typedef FallOff<Arrhenius, fallOffFunctions::Lindemann>
+    FallOffArrheniusLindemann;
+typedef FallOff<Arrhenius, fallOffFunctions::Troe> FallOffArrheniusTroe;
+typedef FallOff<Arrhenius, fallOffFunctions::SRI> FallOffArrheniusSRI;
 
-forExtraCoeffGases(makeIRTemplate2Reactions,
-                   FallOffReactionRate,
-                   ArrheniusReactionRate,
-                   TroeFallOffFunction);
+typedef ChemicallyActivated<Arrhenius, fallOffFunctions::Lindemann>
+    ChemicallyActivatedArrheniusLindemann;
+typedef ChemicallyActivated<Arrhenius, fallOffFunctions::Troe>
+    ChemicallyActivatedArrheniusTroe;
+typedef ChemicallyActivated<Arrhenius, fallOffFunctions::SRI>
+    ChemicallyActivatedArrheniusSRI;
+} // namespace reactionRates
 
-forExtraCoeffGases(makeIRTemplate2Reactions,
-                   FallOffReactionRate,
-                   ArrheniusReactionRate,
-                   SRIFallOffFunction);
+forExtraCoeffGases(makeReversibleReaction, dictionary, Arrhenius);
+forExtraCoeffGases(makeReversibleReaction, dictionary, LandauTeller);
+forExtraCoeffGases(makeReversibleReaction, dictionary, ThirdBodyArrhenius);
+forExtraCoeffGases(makeReversibleReaction, dictionary, Janev);
+forExtraCoeffGases(makeReversibleReaction, dictionary, powerSeries);
 
-forExtraCoeffGases(makeIRTemplate2Reactions,
-                   ChemicallyActivatedReactionRate,
-                   ArrheniusReactionRate,
-                   LindemannFallOffFunction);
+forExtraCoeffGases(makeReversibleReaction,
+                   dictionary,
+                   FallOffArrheniusLindemann);
 
-forExtraCoeffGases(makeIRTemplate2Reactions,
-                   ChemicallyActivatedReactionRate,
-                   ArrheniusReactionRate,
-                   TroeFallOffFunction);
+forExtraCoeffGases(makeReversibleReaction,
+                   dictionary,
+                   FallOffArrheniusTroe);
 
-forExtraCoeffGases(makeIRTemplate2Reactions,
-                   ChemicallyActivatedReactionRate,
-                   ArrheniusReactionRate,
-                   SRIFallOffFunction);
+forExtraCoeffGases(makeReversibleReaction,
+                   dictionary,
+                   FallOffArrheniusSRI);
+
+forExtraCoeffGases(makeReversibleReaction,
+                   dictionary,
+                   ChemicallyActivatedArrheniusLindemann);
+
+forExtraCoeffGases(makeReversibleReaction,
+                   dictionary,
+                   ChemicallyActivatedArrheniusTroe);
+
+forExtraCoeffGases(makeReversibleReaction,
+                   dictionary,
+                   ChemicallyActivatedArrheniusSRI);
 
 // Finally add the chemistry models
 forExtraCoeffGases(makeChemistryModels, gpuChemistryModel);

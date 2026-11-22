@@ -67,7 +67,7 @@ FoamGpu::GpuKernelEvaluator gpuChemistryModel<cpuThermoType>::makeEvaluator(
     label                                       nCells,
     label                                       nEqns,
     label                                       nSpecie,
-    const ReactionList<cpuThermoType>&          reactions,
+    const reactionList&                         reactions,
     const dictionary&                           physicalProperties,
     const dictionary&                           chemistryProperties,
     const multicomponentMixture<cpuThermoType>& mixture) {
@@ -97,7 +97,10 @@ gpuChemistryModel<cpuThermoType>::gpuChemistryModel(const fluidMulticomponentThe
     , mixture_(dynamicCast<const multicomponentMixture<cpuThermoType>>(
           this->thermo()))
     , specieThermos_(mixture_.specieThermos())
-    , reactions_(mixture_.species(), specieThermos_, this->mesh(), *this)
+    , reactions_(mixture_.species(),
+                 SpecieThermosRef<cpuThermoType>(specieThermos_),
+                 this->mesh(),
+                 *this)
     , RR_(this->thermo().Y().size())
     , evaluator_(makeEvaluator(
           zone_.nCells(),
@@ -467,8 +470,8 @@ gpuChemistryModel<cpuThermoType>::tc() const {
 
         scalar sumW = 0, sumWRateByCTot = 0;
         forAll(reactions_, i) {
-            const Reaction<cpuThermoType>& R = reactions_[i];
-            scalar                         omegaf, omegar;
+            const reaction& R = reactions_[i];
+            scalar          omegaf, omegar;
             R.omega(rs, omegaf, omegar);
 
             scalar wf = 0;
