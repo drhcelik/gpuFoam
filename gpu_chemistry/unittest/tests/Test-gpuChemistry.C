@@ -11,7 +11,7 @@
 #include "makeGpuReactionRate.H"
 #include "reaction.H"
 #include "thirdBodyEfficiencies.H"
-#include "SRIFallOffFunction.H"
+#include "SRI_fallOffFunction.H"
 #include "IStringStream.H"
 #include "scalarMatrices.H"
 #include "ludecompose.H"
@@ -984,7 +984,7 @@ TEST_CASE("Test gpuSRIFallOffFunction (on CPU)", "[CPU]")
 
     const gScalar a = 0.45, b = 797, c = 979, d = 1.2, e = 0.3;
     const gpuSRIFallOffFunction test(a, b, c, d, e);
-    const Foam::SRIFallOffFunction ref(a, b, c, d, e);
+    const Foam::fallOffFunctions::SRI ref(a, b, c, d, e);
 
     for (const gScalar T : {300.0, 1000.0, 2500.0})
     {

@@ -5,8 +5,8 @@
 
 #include "speciesTable.H"
 
-#include "ReactionList.H"
-#include "ReversibleReaction.H"
+#include "reactionList.H"
+#include "specieThermosRef.H"
 #include "sensibleEnthalpy.H"
 
 #include "sutherlandTransport.H"
@@ -25,6 +25,6 @@ Foam::PtrList<FoamGpu::testThermoType3> makeCpuThermos_e(TestData::Mechanism m);
 
 Foam::dictionary makeReactionDict(TestData::Mechanism m);
 
-Foam::ReactionList<FoamGpu::testThermoType1>
+Foam::reactionList
 makeCpuReactions(TestData::Mechanism m);
 } // namespace TestData

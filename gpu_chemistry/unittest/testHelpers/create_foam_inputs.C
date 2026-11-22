@@ -110,15 +110,17 @@ Foam::dictionary makeReactionDict(TestData::Mechanism m) {
     return reactionDict;
 }
 
-Foam::ReactionList<FoamGpu::testThermoType1>
+Foam::reactionList
 makeCpuReactions(TestData::Mechanism m) {
 
     auto thermos      = makeCpuThermos_h(m);
     auto species      = makeSpeciesTable(m);
     auto reactionDict = makeReactionDict(m);
 
-    return Foam::ReactionList<FoamGpu::testThermoType1>(
-        species, thermos, reactionDict);
+    return Foam::reactionList(
+        species,
+        Foam::SpecieThermosRef<FoamGpu::testThermoType1>(thermos),
+        reactionDict);
 }
 
 } // namespace TestData

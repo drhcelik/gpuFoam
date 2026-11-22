@@ -10,14 +10,15 @@ namespace Foam {
 enum jacobianType { fast = 0, exact = 1 };
 
 //- Reference ODE system mirroring chemistryModels::Standard::derivatives and
-//  ::jacobian of OpenFOAM-dev (f31f38e312).
+//  ::jacobian of OpenFOAM-dev (f31f38e312), with the reactions' Jacobian
+//  work arrays held by the reactions as OpenFOAM-dev (62be3e2828).
 //
 //  The state is Y_0..Y_{n-1}, T (nEqns = nSpecie + 1) with the pressure
 //  held constant as a member (p_), as in the gpuFoam GPU ODE system.
 class MockOFSystem : public ODESystem {
 
     const PtrList<FoamGpu::testThermoType1>            specieThermos_;
-    const ReactionList<FoamGpu::testThermoType1>       reactions_;
+    const reactionList                       reactions_;
     label                                    nSpecie_;
     scalar                                   p_;
     mutable scalarField                      Y_;
@@ -33,7 +34,7 @@ class MockOFSystem : public ODESystem {
 
 public:
 
-    const ReactionList<FoamGpu::testThermoType1>& getReactions() const
+    const reactionList& getReactions() const
     {
         return reactions_;
     }
@@ -42,7 +43,8 @@ public:
     MockOFSystem(TestData::Mechanism m)
         : specieThermos_(TestData::makeCpuThermos_h(m))
         , reactions_(TestData::makeSpeciesTable(m),
-                     specieThermos_,
+                     SpecieThermosRef<FoamGpu::testThermoType1>(
+                         specieThermos_),
                      TestData::makeReactionDict(m))
         , nSpecie_(TestData::speciesCount(m))
         , p_(TestData::pInf(m))
@@ -187,9 +189,7 @@ public:
                                        ddNdtByVdcT,
                                        reduction_,
                                        cTos_,
-                                       nSpecie_,
-                                       YTWork_[1],
-                                       YTWork_[2]);
+                                       nSpecie_);
         }
 
         // Reactions return dNdtByV, so we need to convert the result

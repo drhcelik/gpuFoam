@@ -115,10 +115,56 @@ TestData::thermoResults thermo_e(TestData::Mechanism mech) {
     return ret;
 }
 
+//- The reaction thermo, as OpenFOAM-dev (62be3e2828)
+//  reactions::Reversible::thermo
+template <class ThermoType>
+static typename ThermoType::thermoType
+reactionThermo(const Foam::reaction&            r,
+               const Foam::PtrList<ThermoType>& specieThermos) {
+    typename ThermoType::thermoType rhsThermo(
+        r.rhs()[0].stoichCoeff * specieThermos[r.rhs()[0].index].W() *
+        specieThermos[r.rhs()[0].index]);
+
+    for (Foam::label i = 1; i < r.rhs().size(); ++i) {
+        rhsThermo += r.rhs()[i].stoichCoeff *
+                     specieThermos[r.rhs()[i].index].W() *
+                     specieThermos[r.rhs()[i].index];
+    }
+
+    typename ThermoType::thermoType lhsThermo(
+        r.lhs()[0].stoichCoeff * specieThermos[r.lhs()[0].index].W() *
+        specieThermos[r.lhs()[0].index]);
+
+    for (Foam::label i = 1; i < r.lhs().size(); ++i) {
+        lhsThermo += r.lhs()[i].stoichCoeff *
+                     specieThermos[r.lhs()[i].index].W() *
+                     specieThermos[r.lhs()[i].index];
+    }
+
+    return lhsThermo == rhsThermo;
+}
+
+//- The concentration product of the reactants or products, as
+//  OpenFOAM-dev (62be3e2828) reaction::cPowExponentProduct
+static Foam::scalar
+cPowExponentProduct(const Foam::List<Foam::specieCoeffs>& coeffs,
+                    const Foam::scalarField&              c) {
+    Foam::scalar result = pow(c[coeffs[0].index], coeffs[0].exponent);
+
+    for (Foam::label i = 1; i < coeffs.size(); ++i) {
+        result *= pow(c[coeffs[i].index], coeffs[i].exponent);
+    }
+
+    return result;
+}
+
 TestData::reactionResults reaction(TestData::Mechanism mech) {
-    const Foam::ReactionList<FoamGpu::testThermoType1> reactions(
+    const Foam::PtrList<FoamGpu::testThermoType1> thermos =
+        TestData::makeCpuThermos_h(mech);
+
+    const Foam::reactionList reactions(
         TestData::makeSpeciesTable(mech),
-        TestData::makeCpuThermos_h(mech),
+        Foam::SpecieThermosRef<FoamGpu::testThermoType1>(thermos),
         TestData::makeReactionDict(mech));
 
     const gLabel nSpecie    = TestData::speciesCount(mech);
@@ -139,8 +185,6 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
     const gLabel       nEqnsRef = nSpecie + 1;
     Foam::List<gLabel> c2s;
     gLabel             Tsi  = nSpecie;
-    Foam::scalarField  cTWork0(nEqnsRef, 0);
-    Foam::scalarField  cTWork1(nEqnsRef, 0);
 
     Foam::reaction::state s(nSpecie);
     s.reset(p, T, c, li);
@@ -162,14 +206,20 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
         // (JANAF) limits, which are not the reaction limits.
         Thigh[i] = reactions.Thigh();
         Tlow[i]  = reactions.Tlow();
-        Kc[i]    = reactions[i].Kc(p, T);
-        kf[i]    = reactions[i].kf(s);
-        kr[i]    = reactions[i].kr(s);
+
+        // OpenFOAM-dev (62be3e2828) no longer provides Kc, kf and kr for
+        // the reactions. Kc is evaluated from the reaction thermo, also for
+        // the irreversible reactions, and kf and kr from the forward and
+        // reverse rates omegaf = kf*Cf and omegar = kr*Cr.
+        Kc[i] = reactionThermo(reactions[i], thermos).Kc(p, T);
 
         // arbitrary
         Foam::scalar omegaf = 0.3;
         Foam::scalar omegar = 0.4;
         omega[i] = reactions[i].omega(s, omegaf, omegar);
+
+        kf[i] = omegaf / cPowExponentProduct(reactions[i].lhs(), c);
+        kr[i] = omegar / cPowExponentProduct(reactions[i].rhs(), c);
 
         Foam::scalarField dNdtByV_f(c.size(), 0);
         reactions[i].dNdtByV(s,
@@ -188,9 +238,7 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
                                  ddNdtByVdcT_f,
                                  false,
                                  c2s,
-                                 Tsi,
-                                 cTWork0,
-                                 cTWork1);
+                                 Tsi);
 
         ddNdtByVdcTp[i] = std::vector<gScalar>(
             ddNdtByVdcT_f.v(),
