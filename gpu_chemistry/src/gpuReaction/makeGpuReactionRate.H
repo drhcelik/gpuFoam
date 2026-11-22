@@ -1,5 +1,9 @@
 #pragma once
 
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "gpuReactionRate.H"
 #include "physicoChemicalConstants.H"
 #include "scalarField.H"
@@ -196,6 +200,53 @@ static Rate make_k0kInfFRate(const Foam::speciesTable& species,
     return Rate(k0, kInf, f, tbes);
 }
 
+//- Convert the templated reaction type names of OpenFOAM-dev 62be3e2828,
+//  e.g. Reversible<FallOff<Arrhenius,Troe>>, to the original names, e.g.
+//  reversibleArrheniusTroeFallOff. This is the inverse of the backward
+//  compatibility table Foam::reaction::backwardTypeToType. Any other name is
+//  returned unchanged.
+static inline std::string
+backward_reaction_type_name(const std::string& type) {
+    using pair = std::pair<std::string, std::string>;
+
+    static const std::vector<pair> reactions = {
+        {"irreversible", "Irreversible"},
+        {"reversible", "Reversible"},
+        {"nonEquilibriumReversible", "NonEquilibriumReversible"}};
+
+    static const std::vector<pair> rates = {
+        {"Arrhenius", "Arrhenius"},
+        {"ArrheniusLindemannChemicallyActivated",
+         "ChemicallyActivated<Arrhenius,Lindemann>"},
+        {"ArrheniusSRIChemicallyActivated",
+         "ChemicallyActivated<Arrhenius,SRI>"},
+        {"ArrheniusTroeChemicallyActivated",
+         "ChemicallyActivated<Arrhenius,Troe>"},
+        {"ArrheniusLindemannFallOff", "FallOff<Arrhenius,Lindemann>"},
+        {"ArrheniusSRIFallOff", "FallOff<Arrhenius,SRI>"},
+        {"ArrheniusTroeFallOff", "FallOff<Arrhenius,Troe>"},
+        {"FluxLimitedLangmuirHinshelwood", "fluxLimitedLangmuirHinshelwood"},
+        {"Janev", "Janev"},
+        {"LandauTeller", "LandauTeller"},
+        {"LangmuirHinshelwood", "LangmuirHinshelwood"},
+        {"MichaelisMenten", "MichaelisMenten"},
+        {"PhaseSurfaceArrhenius", "PhaseSurface<Arrhenius>"},
+        {"PLog", "pLog"},
+        {"PowerSeries", "powerSeries"},
+        {"SurfaceArrhenius", "Surface<Arrhenius>"},
+        {"ThirdBodyArrhenius", "ThirdBody<Arrhenius>"}};
+
+    for (const auto& reaction : reactions) {
+        for (const auto& rate : rates) {
+            if (type == reaction.second + '<' + rate.second + '>') {
+                return reaction.first + rate.first;
+            }
+        }
+    }
+
+    return type;
+}
+
 static inline gpuReactionRate
 make_reaction_rate(const Foam::speciesTable& species,
                    const Foam::dictionary&   dict) {
@@ -203,14 +254,18 @@ make_reaction_rate(const Foam::speciesTable& species,
 
     const Foam::word& temp = dict.lookup("type");
 
+    // Accept the templated typenames of OpenFOAM-dev 62be3e2828, e.g.
+    // Reversible<FallOff<Arrhenius,Troe>>, as well as the original names
+    const std::string typeName = backward_reaction_type_name(temp);
+
     // Allow for typenames where the substring "Reaction" has been
     // subtracted. This is likely some backwards compatibility thing.
     std::string reactionTypeName = [=]() {
-        auto pos = temp.find("Reaction");
+        auto pos = typeName.find("Reaction");
         if (pos != std::string::npos) {
-            return std::string(temp.begin(), temp.begin() + pos);
+            return std::string(typeName.begin(), typeName.begin() + pos);
         }
-        return std::string(temp.begin(), temp.end());
+        return std::string(typeName.begin(), typeName.end());
     }();
 
     if (reactionTypeName == "reversibleArrhenius") {

@@ -62,6 +62,8 @@ The following reaction rate types are supported, each as a reversible and an irr
 * ArrheniusTroeChemicallyActivated
 * ArrheniusSRIChemicallyActivated
 
+The templated type names of OpenFOAM-dev, e.g. ```Reversible<Arrhenius>```, ```Irreversible<ThirdBody<Arrhenius>>``` and ```Reversible<FallOff<Arrhenius,Troe>>```, are also accepted, as written by ```chemkinToFoam```.
+
 The non-equilibrium reversible reactions and the surface, Michaelis-Menten, Langmuir-Hinshelwood and powerSeries rates are not supported and stop the run with an error.
 
 #### Supported chemistry model controls
