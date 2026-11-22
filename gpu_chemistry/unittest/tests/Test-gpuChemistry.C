@@ -16,6 +16,7 @@
 #include "scalarMatrices.H"
 #include "ludecompose.H"
 #include <algorithm>
+#include <array>
 
 
 TEST_CASE("make_mdspan", "[CPU]"){
@@ -1025,7 +1026,10 @@ TEST_CASE("Test make_reaction_rate unsupported types (on CPU)", "[CPU]")
         "type reversiblePowerSeries; A 1; beta 0; theta 0; b 4(0 0 0 0);",
         "type irreversibleMichaelisMenten; Km 1; S H2; Vmax 1;",
         "type reversibleLangmuirHinshelwood; reactants 2(H2 O2);",
-        "type irreversibleSurfaceArrhenius; A 1; beta 0; Ta 0;"
+        "type irreversibleSurfaceArrhenius; A 1; beta 0; Ta 0;",
+        "type NonEquilibriumReversible<Arrhenius>; "
+        "forward {A 1; beta 0; Ta 0;} reverse {A 1; beta 0; Ta 0;}",
+        "type Irreversible<Surface<Arrhenius>>; A 1; beta 0; Ta 0;"
     };
 
     for (const auto& d : dicts)
@@ -1040,6 +1044,135 @@ TEST_CASE("Test make_reaction_rate unsupported types (on CPU)", "[CPU]")
             );
         }
     }
+}
+
+
+TEST_CASE("Test make_reaction_rate templated type names (on CPU)", "[CPU]")
+{
+    using namespace FoamGpu;
+
+    // The templated type names of OpenFOAM-dev 62be3e2828 give the same
+    // rates as the original names
+    const Foam::wordList names({"H2", "O2", "H2O", "N2"});
+    const Foam::speciesTable species(names);
+
+    const std::vector<gScalar> c = {0.1, 0.2, 0.3, 0.4};
+    const auto cs = make_mdspan(c, extents<1>(c.size()));
+
+    const std::string arrhenius = "A 1e10; beta 0.5; Ta 5000;";
+    const std::string k0kInf =
+        "k0 {A 1e12; beta -1; Ta 100;} kInf {" + arrhenius + "} "
+        "thirdBodyEfficiencies "
+        "{defaultEfficiency 1; efficiencies 2((H2O 6)(N2 0.5));}";
+    const std::string troe =
+        k0kInf + " F {alpha 0.5; Tsss 100; Ts 1000; Tss 5000;}";
+    const std::string sri = k0kInf + " F {a 1; b 100; c 1000; d 1; e 0;}";
+
+    // The original and templated rate names and the coefficients
+    const std::vector<std::array<std::string, 3>> rates =
+    {
+        {"Arrhenius", "Arrhenius", arrhenius},
+        {"LandauTeller", "LandauTeller", arrhenius + " B 10; C 20;"},
+        {
+            "Janev",
+            "Janev",
+            arrhenius + " b 9(0.1 0.2 0.3 0.01 0.02 0.03 0.001 0.002 0.003);"
+        },
+        {
+            "PLog",
+            "pLog",
+            "coeffs 2((1e5 1e10 0.5 5000) (1e6 2e10 0.4 6000));"
+        },
+        {
+            "ThirdBodyArrhenius",
+            "ThirdBody<Arrhenius>",
+            arrhenius
+          + " defaultEfficiency 1; efficiencies 2((H2O 6)(N2 0.5));"
+        },
+        {
+            "ArrheniusLindemannFallOff",
+            "FallOff<Arrhenius,Lindemann>",
+            k0kInf
+        },
+        {"ArrheniusTroeFallOff", "FallOff<Arrhenius,Troe>", troe},
+        {"ArrheniusSRIFallOff", "FallOff<Arrhenius,SRI>", sri},
+        {
+            "ArrheniusLindemannChemicallyActivated",
+            "ChemicallyActivated<Arrhenius,Lindemann>",
+            k0kInf
+        },
+        {
+            "ArrheniusTroeChemicallyActivated",
+            "ChemicallyActivated<Arrhenius,Troe>",
+            troe
+        },
+        {
+            "ArrheniusSRIChemicallyActivated",
+            "ChemicallyActivated<Arrhenius,SRI>",
+            sri
+        }
+    };
+
+    const std::vector<std::array<std::string, 2>> reactions =
+    {
+        {"irreversible", "Irreversible"},
+        {"reversible", "Reversible"}
+    };
+
+    for (const auto& r : reactions)
+    {
+        for (const auto& k : rates)
+        {
+            const std::string oldName = r[0] + k[0];
+            const std::string newName = r[1] + '<' + k[1] + '>';
+
+            DYNAMIC_SECTION(newName)
+            {
+                CHECK(backward_reaction_type_name(newName) == oldName);
+                CHECK(backward_reaction_type_name(oldName) == oldName);
+
+                const Foam::dictionary oldDict
+                (
+                    (Foam::IStringStream("type " + oldName + "; " + k[2]))()
+                );
+                const Foam::dictionary newDict
+                (
+                    (Foam::IStringStream("type " + newName + "; " + k[2]))()
+                );
+
+                const auto ref = make_reaction_rate(species, oldDict);
+                const auto test = make_reaction_rate(species, newDict);
+
+                CHECK(test.isIrreversible() == ref.isIrreversible());
+                CHECK(test.isIrreversible() == (r[1] == "Irreversible"));
+                CHECK(test.hasDdc() == ref.hasDdc());
+
+                for (const gScalar p : {1e5, 5e5})
+                {
+                    for (const gScalar T : {500.0, 1500.0})
+                    {
+                        CHECK(test(p, T, cs) == ref(p, T, cs));
+                        CHECK(test.ddT(p, T, cs) == ref.ddT(p, T, cs));
+                    }
+                }
+            }
+        }
+    }
+
+    // The old names with the "Reaction" suffix are still accepted
+    const Foam::dictionary suffixDict
+    (
+        (Foam::IStringStream("type reversibleArrheniusReaction; " + arrhenius))()
+    );
+    const Foam::dictionary newDict
+    (
+        (Foam::IStringStream("type Reversible<Arrhenius>; " + arrhenius))()
+    );
+    CHECK
+    (
+        make_reaction_rate(species, suffixDict)(1e5, 1000, cs)
+     == make_reaction_rate(species, newDict)(1e5, 1000, cs)
+    );
 }
 
 
