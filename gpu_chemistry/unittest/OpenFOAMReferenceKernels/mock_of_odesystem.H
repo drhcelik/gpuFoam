@@ -4,6 +4,7 @@
 
 #include "ODESystem.H"
 #include "create_foam_inputs.H"
+#include "openfoam_reference_reactions.H"
 
 namespace Foam {
 
@@ -18,7 +19,8 @@ enum jacobianType { fast = 0, exact = 1 };
 class MockOFSystem : public ODESystem {
 
     const PtrList<FoamGpu::testThermoType1>            specieThermos_;
-    const reactionList                       reactions_;
+    const autoPtr<reactionList>              reactionsPtr_;
+    const reactionList&                      reactions_;
     label                                    nSpecie_;
     scalar                                   p_;
     mutable scalarField                      Y_;
@@ -42,10 +44,8 @@ public:
 
     MockOFSystem(TestData::Mechanism m)
         : specieThermos_(TestData::makeCpuThermos_h(m))
-        , reactions_(TestData::makeSpeciesTable(m),
-                     SpecieThermosRef<FoamGpu::testThermoType1>(
-                         specieThermos_),
-                     TestData::makeReactionDict(m))
+        , reactionsPtr_(OFReferenceKernels::makeReactions(m, specieThermos_))
+        , reactions_(reactionsPtr_())
         , nSpecie_(TestData::speciesCount(m))
         , p_(TestData::pInf(m))
         , Y_(nSpecie_)
@@ -184,12 +184,8 @@ public:
             }
         }
         forAll(reactions_, ri) {
-            reactions_[ri].ddNdtByVdcT(s_,
-                                       dYTdt,
-                                       ddNdtByVdcT,
-                                       reduction_,
-                                       cTos_,
-                                       nSpecie_);
+            OFReferenceKernels::ddNdtByVdcT(
+                reactions_[ri], s_, dYTdt, ddNdtByVdcT, nSpecie_);
         }
 
         // Reactions return dNdtByV, so we need to convert the result

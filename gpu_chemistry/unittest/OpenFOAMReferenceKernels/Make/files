@@ -1,4 +1,5 @@
 openfoam_reference_kernels.C
+openfoam_reference_reactions.C
 
 
 LIB = $(FOAM_USER_LIBBIN)/libGpuFoamOpenFOAMReferenceKernels

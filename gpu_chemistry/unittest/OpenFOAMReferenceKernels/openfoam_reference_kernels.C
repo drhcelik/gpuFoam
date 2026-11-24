@@ -7,6 +7,7 @@
 #include "volFields.H"
 
 #include "mock_of_odesystem.H"
+#include "openfoam_reference_reactions.H"
 #include "create_gpu_inputs.H"
 
 namespace OFReferenceKernels {
@@ -162,10 +163,9 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
     const Foam::PtrList<FoamGpu::testThermoType1> thermos =
         TestData::makeCpuThermos_h(mech);
 
-    const Foam::reactionList reactions(
-        TestData::makeSpeciesTable(mech),
-        Foam::SpecieThermosRef<FoamGpu::testThermoType1>(thermos),
-        TestData::makeReactionDict(mech));
+    const Foam::autoPtr<Foam::reactionList> reactionsPtr =
+        makeReactions(mech, thermos);
+    const Foam::reactionList& reactions = reactionsPtr();
 
     const gLabel nSpecie    = TestData::speciesCount(mech);
     const gLabel nEqns      = TestData::equationCount(mech);
@@ -183,7 +183,6 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
 
     // OpenFOAM-dev reaction Jacobian layout: [c_0..c_{n-1}, T]
     const gLabel       nEqnsRef = nSpecie + 1;
-    Foam::List<gLabel> c2s;
     gLabel             Tsi  = nSpecie;
 
     Foam::reaction::state s(nSpecie);
@@ -233,12 +232,8 @@ TestData::reactionResults reaction(TestData::Mechanism mech) {
         Foam::scalarSquareMatrix ddNdtByVdcT_f(nEqnsRef, 0);
 
         dNdtByV_f = 0; // probably not necessary
-        reactions[i].ddNdtByVdcT(s,
-                                 dNdtByV_f,
-                                 ddNdtByVdcT_f,
-                                 false,
-                                 c2s,
-                                 Tsi);
+        OFReferenceKernels::ddNdtByVdcT(
+            reactions[i], s, dNdtByV_f, ddNdtByVdcT_f, Tsi);
 
         ddNdtByVdcTp[i] = std::vector<gScalar>(
             ddNdtByVdcT_f.v(),

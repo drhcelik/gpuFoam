@@ -86,6 +86,7 @@ $G/gpu_chemistry/catchMain/main.C
 $G/gpu_chemistry/unittest/testHelpers/create_foam_inputs.C
 $G/gpu_chemistry/unittest/testHelpers/create_gpu_inputs.C
 $G/gpu_chemistry/unittest/OpenFOAMReferenceKernels/openfoam_reference_kernels.C
+$G/gpu_chemistry/unittest/OpenFOAMReferenceKernels/openfoam_reference_reactions.C
 $G/gpu_chemistry/unittest/cpuTestKernels/cpu_test_kernels.C
 $G/gpu_chemistry/unittest/gpuTestKernels/gpu_test_kernels.cu
 $G/gpu_chemistry/unittest/tests/Test-gpuChemistry.C"
